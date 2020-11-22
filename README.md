@@ -1,2 +1,8 @@
-# tatort-wikibot
-Scripts to check for discrepancies and omissions in Wikipedia articles for episodes of the German language TV series "Tatort"
+## tatort-wikibot
+
+* `python3 tatort-wiki.py > tatort.txt` (requires [pywikibot](https://www.mediawiki.org/wiki/Manual:Pywikibot))
+* `grep ^LOG tatort.txt > tatort.log`
+* `grep -v ^LOG tatort.txt | grep -v ^CAT > tatort-wiki-episodes.txt`
+* `python3 tatort.py fetch > tatort-html-episodes.txt`
+* `python3 tatort.py diff`
+
