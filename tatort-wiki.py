@@ -72,6 +72,16 @@ Special_Dates = {
 	('Tatort: Taxi nach Leipzig (1970)', 'VG-DATUM'): (EnDash, EnDash),
 	('Tatort: Borowski und die Frau am Fenster', 'Erstausstrahlung'): ('2. Oktober [[2011]]', '2011-10-02'),
 }
+Alternate_Infobox_Dates = {
+	'Tatort: Exklusiv!': ('1969-10-26', '1971-07-11'),
+	'Zahn um Zahn (1985)': ('1985-10-10', '1987-12-27'),
+	'Zabou (Film)': ('1987-03-05', '1990-07-22'),
+	'Tatort: Mord hinterm Deich': ('1996-12-25', '1997-06-08'),
+	'Tatort: Passion': ('1999-11-17', '2000-07-30'),
+	'Tatort: Time-Out': ('2001-09-23', '2002-12-22'),
+	'Tatort: Seenot': ('2008-01-13', '2008-03-24'),
+	'Tatort: Der Polizistinnenmörder': ('2010-01-03', '2010-01-17'),
+}
 def parse_date_extra(info, param, extra):
 	if extra == ' (nur ORF)':
 		if param == 'VG-DATUM':
@@ -224,6 +234,12 @@ def get_infobox_date(info, params):
 		v = parse_date(v, info, p)
 		if not v:
 			continue
+		alt = Alternate_Infobox_Dates.get(info.page_name)
+		if alt:
+			if v == alt[0]:
+				v = alt[1]
+			else:
+				log(info, 'Unexpected Infobox date|{}|{}|', v, alt[0])
 		if not date:
 			date = v
 			date_param = p
