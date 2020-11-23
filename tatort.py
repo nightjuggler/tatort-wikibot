@@ -104,7 +104,7 @@ def read_wiki():
 		'\u2019' # apostrophe (right single quotation mark)
 		'\u2026' # ellipsis
 	)
-	title_pattern = re.compile('[- !,0-9:?A-Za-zÄÜäöüßâàéô' + special_chars + ']+')
+	title_pattern = re.compile('[- !,.0-9:?A-Za-zÄÜäöüßâàéô' + special_chars + ']+')
 
 	wiki_episodes = {}
 	with InputFile(TATORT_WIKI_EPISODES) as f:
