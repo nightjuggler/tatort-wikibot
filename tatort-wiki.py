@@ -117,6 +117,7 @@ def parse_date(date, info, param):
 Alternate_Titles = {
 	'Tatort: Acht, neun – aus': 'Acht, Neun – aus!',
 	'Tatort: Aus der Traum (2006)': 'Aus der Traum …',
+	'Tatort: Die schlafende Schöne': 'Die Schlafende Schöne',
 	'Tatort: Laura mein Engel': 'Laura, mein Engel',
 	'Tatort: Romeo und Julia': 'Romeo & Julia',
 	'Tatort: Stirb und werde': 'Stirb und Werde',
@@ -180,7 +181,7 @@ def do_imdb(info, params):
 		return
 
 	title = params.get('2')
-	if title:
+	if title is not None:
 		check_title(info, 'IMDb', title)
 
 	info.imdb = params
@@ -292,10 +293,9 @@ def do_tatort_template(info, params, info_attr, template, required_params):
 	title = params.get('Titel')
 	if title is not None:
 		del params['Titel']
-		if title:
-			check_title(info, template, title)
-			if title != default_tatort_template_title(info.page_name):
-				saved['Titel'] = title
+		check_title(info, template, title)
+		if title != default_tatort_template_title(info.page_name):
+			saved['Titel'] = title
 	if params:
 		log(info, 'Extraneous {} parameters|{}|', template, stringify(params))
 
@@ -305,15 +305,15 @@ def do_tatort_template(info, params, info_attr, template, required_params):
 	elif prev_params == saved:
 		log(info, 'Skipping duplicate {}', template)
 	else:
-		prev_title = prev_params.pop('Titel', '')
-		title = saved.pop('Titel', '')
+		prev_title = prev_params.pop('Titel', None)
+		title = saved.pop('Titel', None)
 		if prev_params == saved:
 			log(info, 'Skipping {} with different title|{}|{}|', template, prev_title, title)
 		else:
 			log(info, 'Skipping different {}', template)
 			log(info, '<<|{}|', stringify(prev_params))
 			log(info, '>>|{}|', stringify(saved))
-		if prev_title:
+		if prev_title is not None:
 			prev_params['Titel'] = prev_title
 
 def do_tatort_fans(info, params):
