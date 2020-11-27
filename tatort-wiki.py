@@ -346,13 +346,9 @@ def check_tatort_nr(info, ep, params, template, lookup):
 	if n != ep:
 		log(info, 'Mismatched Tatort-{} episode number|{}|{}|', template, n, ep)
 
-def get_pages(site, template, use_pagegenerators=False):
-	if use_pagegenerators:
-		gen_factory = pywikibot.pagegenerators.GeneratorFactory(site)
-		gen_factory.handleArg('-transcludes:' + template)
-		return gen_factory.getCombinedGenerator(preload=True)
-
-	return pywikibot.Page(site, template, ns=Namespace.TEMPLATE).getReferences(
+def get_pages():
+	site = pywikibot.Site(code='de')
+	return pywikibot.Page(site, 'Tatort-Folge', ns=Namespace.TEMPLATE).getReferences(
 		only_template_inclusion=True)
 #		only_template_inclusion=True, namespaces=(Namespace.MAIN,), total=100)
 
@@ -370,10 +366,8 @@ def main():
 	categories = {}
 	info_list = []
 	main_ns = Namespace.MAIN
-	talk_ns = Namespace.TALK
-	site = pywikibot.Site(code='de')
 
-	for page in get_pages(site, 'Tatort-Folge'):
+	for page in get_pages():
 		skip = False
 		info = TatortInfo(page.title())
 
