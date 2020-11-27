@@ -86,9 +86,6 @@ def read_html():
 	html_episodes.append(('2017-06-18',
 		'Borowski und das Fest des Nordens',
 		'borowski-und-das-fest-des-nordens-104'))
-	html_episodes.append(('2018-12-09',
-		'Vom Himmel hoch',
-		'vom-himmel-hoch-106'))
 
 	html_episodes.sort()
 	return html_episodes
