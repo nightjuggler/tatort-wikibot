@@ -9,45 +9,6 @@ def log(info, format_spec, *args):
 def stringify(params):
 	return '|'.join(['='.join(p) for p in sorted(params.items())])
 
-ORF_Episodes = {
-	168: (
-		('1985-05-19', 'Fahrerflucht'),
-	),
-	171: (
-		('1985-09-08', 'Des Glückes Rohstoff'),
-	),
-	176: (
-		('1986-01-12', 'Strindbergs Früchte'),
-	),
-	178: (
-		('1986-03-02', 'Das Archiv'),
-	),
-	181: (
-		('1986-06-13', 'Die Spieler'),
-	),
-	184: (
-		('1986-08-24', 'Alleingang'),
-	),
-	186: (
-		('1986-10-12', 'Der Schnee vom vergangenen Jahr'),
-	),
-	187: (
-		('1986-12-18', 'Der Tod des Tänzers'),
-	),
-	188: (
-		('1987-01-11', 'Die offene Rechnung'),
-	),
-	192: (
-		('1987-04-25', 'Superzwölfer'),
-	),
-	199: (
-		('1987-12-08', 'Atahualpa'),
-		('1987-12-19', 'Flucht in den Tod'),
-	),
-	218: (
-		('1989-05-21', 'Geld für den Griechen'),
-	),
-}
 EnDash = '\u2013'
 Months = {
 	'Januar':    1, 'Jan.':  1,
@@ -69,8 +30,8 @@ Months = {
 Month_Days = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 Date_Pattern = re.compile('^(?:\\{\\{0\\}\\})?([1-9][0-9]?)\\.(?: |&nbsp;)([A-Z][a-zä]+\\.?) ([12][0-9]{3})')
 Special_Dates = {
-	('Tatort: Taxi nach Leipzig (1970)', 'VG-DATUM'): (EnDash, EnDash),
 	('Tatort: Borowski und die Frau am Fenster', 'Erstausstrahlung'): ('2. Oktober [[2011]]', '2011-10-02'),
+	('Tatort: In der Familie', 'Erstausstrahlung'): ('29. November und 6. Dezember 2020', '2020-11-29'),
 }
 Alternate_Infobox_Dates = {
 	'Tatort: Exklusiv!': ('1969-10-26', '1971-07-11'),
@@ -85,10 +46,10 @@ Alternate_Infobox_Dates = {
 def parse_date_extra(info, param, extra):
 	if extra == ' (nur ORF)':
 		if param == 'VG-DATUM':
-			info.prev_ep_orf = True
+			info.prev_orf = True
 			return True
 		if param == 'NF-DATUM':
-			info.next_ep_orf = True
+			info.next_orf = True
 			return True
 	return False
 
@@ -96,8 +57,11 @@ def parse_date(date, info, param):
 	m = Date_Pattern.match(date)
 	if m is None:
 		special = Special_Dates.get((info.page_name, param))
-		if special and date == special[0]:
-			return special[1]
+		if special:
+			if date == special[0]:
+				return special[1]
+		elif date in ('', EnDash) and param in ('VG-DATUM', 'NF-DATUM'):
+			return EnDash
 		log(info, 'Cannot parse date|{}={}|', param, date)
 		return ''
 	extra = date[m.end():]
@@ -124,7 +88,7 @@ Alternate_Titles = {
 	'Tatort: Tote Taube in der Beethovenstraße': 'Kressin: Tote Taube in der Beethovenstraße',
 	'Tatort: … es wird Trauer sein und Schmerz': '... es wird Trauer sein und Schmerz',
 }
-Episode_Number_Pattern = re.compile('^[1-9][0-9]*$')
+Episode_Number_Pattern = re.compile('^[1-9][0-9]*')
 PageName_Suffix_Pattern = re.compile('^ \\([ 0-9A-Za-z]+\\)$')
 
 def get_episode_name(name):
@@ -159,16 +123,18 @@ class TatortInfo(object):
 		self.tatort_fans = None
 		self.tatort_folge = None
 		self.tatort_fundus = None
+		self.double_episode = False
+		self.orf = False
 
 def do_folgenleiste(info, params):
 	if info.prev_episode is not None:
 		log(info, 'Skipping duplicate Folgenleiste')
 		return
 
+	info.prev_orf = False
+	info.next_orf = False
 	info.prev_episode = params.get('VG', '')
 	info.next_episode = params.get('NF', '')
-	info.prev_ep_orf = False
-	info.next_ep_orf = False
 	info.prev_ep_date = parse_date(params.get('VG-DATUM', ''), info, 'VG-DATUM')
 	info.next_ep_date = parse_date(params.get('NF-DATUM', ''), info, 'NF-DATUM')
 
@@ -248,6 +214,32 @@ def get_infobox_date(info, params):
 			log(info, '{} and {} are different', p, date_param)
 
 	return set_infobox_date(info, date)
+
+def check_episode_number(info, ep):
+	m = Episode_Number_Pattern.match(ep)
+	if not m:
+		return False
+
+	i = m.end()
+	suffix = ep[i:]
+	ep = int(ep[:i])
+
+	if suffix == '':
+		suffix = 0
+	elif suffix == 'a':
+		suffix = 1
+		info.orf = True
+	elif suffix == 'b':
+		suffix = 2
+		info.orf = True
+	elif suffix == ', ' + str(ep + 1):
+		suffix = 0
+		info.double_episode = True
+	else:
+		return False
+
+	info.episode_number = (ep, suffix)
+	return True
 
 def set_episode_number(info, ep):
 	if info.episode_number is None:
@@ -348,9 +340,8 @@ def check_tatort_nr(info, ep, params, template, lookup):
 
 def get_pages():
 	site = pywikibot.Site(code='de')
-	return pywikibot.Page(site, 'Tatort-Folge', ns=Namespace.TEMPLATE).getReferences(
-		only_template_inclusion=True)
-#		only_template_inclusion=True, namespaces=(Namespace.MAIN,), total=100)
+	return pywikibot.Page(site, 'Folgenleiste Tatort-Folgen', ns=Namespace.TEMPLATE).getReferences(
+		only_template_inclusion=True, namespaces=(Namespace.MAIN,))
 
 def main():
 	templates = {
@@ -391,12 +382,10 @@ def main():
 			continue
 		if not ep:
 			log(info, 'Missing episode number')
-			skip = True
-		elif Episode_Number_Pattern.match(ep):
-			info.episode_number = int(ep)
-		else:
+			continue
+		if not check_episode_number(info, ep):
 			log(info, 'Invalid episode number|{}|', ep)
-			skip = True
+			continue
 
 		if info.infobox_title:
 			check_title(info, 'Infobox', info.infobox_title)
@@ -411,11 +400,11 @@ def main():
 
 		if info.imdb is None:
 			log(info, 'Missing IMDb')
-		if info.tatort_fans is None:
-			log(info, 'Missing Tatort-Fans')
-		elif ep:
+		if info.tatort_fans:
 			check_tatort_nr(info, ep, info.tatort_fans, 'Fans', Special_Tatort_Fans_Numbers)
-		if info.tatort_fundus and ep:
+		elif not info.orf:
+			log(info, 'Missing Tatort-Fans')
+		if info.tatort_fundus:
 			check_tatort_nr(info, ep, info.tatort_fundus, 'Fundus', Special_Tatort_Fundus_Numbers)
 		if not skip:
 			info_list.append(info)
@@ -424,46 +413,49 @@ def main():
 		print('CAT', '{:5}'.format(count), name, sep='|')
 
 	info_list.sort(key=lambda info: info.episode_number)
-	last = len(info_list) - 1
+	next_ep = (1, 0)
+	prev = None
 
 	def check(info, attr, value):
 		if getattr(info, attr) != value:
 			log(info, 'Mismatched {}|{}|{}|', attr, getattr(info, attr), value)
 
-	for i, info in enumerate(info_list):
-		print(info.episode_number, info.infobox_date, info.episode_name,
-			info.tatort_folge.get('Url', ''), sep='|')
-		if i == 0:
+	def ep2str(ep):
+		n, x = ep
+		ep = str(n)
+		return ep + chr(96 + x) if x else ep
+
+	for info in info_list:
+		ep = info.episode_number
+		if ep != next_ep:
+			log(info, 'Unexpected episode number|{}|{}', ep2str(ep), ep2str(next_ep))
+		elif prev:
+			if prev.orf != info.prev_orf:
+				log(info, '{}xpected " (nur ORF)" after prev_ep_date', 'E' if prev.orf else 'Une')
+			check(info, 'prev_episode', prev.episode_name)
+			check(info, 'prev_ep_date', prev.infobox_date)
+
+			if info.orf != prev.next_orf:
+				log(prev, '{}xpected " (nur ORF)" after next_ep_date', 'E' if info.orf else 'Une')
+			check(prev, 'next_episode', info.episode_name)
+			check(prev, 'next_ep_date', info.infobox_date)
+		else:
 			check(info, 'prev_episode', EnDash)
 			check(info, 'prev_ep_date', EnDash)
-		else:
-			n = info.episode_number - 1
-			orf = ORF_Episodes.get(n)
-			if orf:
-				if not info.prev_ep_orf:
-					log(info, 'Expected " (nur ORF)" after prev_ep_date')
-				prev_date, prev_name = orf[-1]
-				check(info, 'prev_episode', prev_name)
-				check(info, 'prev_ep_date', prev_date)
-			else:
-				prev = info_list[i-1]
-				if prev.episode_number == n:
-					check(info, 'prev_episode', prev.episode_name)
-					check(info, 'prev_ep_date', prev.infobox_date)
-		if i != last:
-			n = info.episode_number
-			orf = ORF_Episodes.get(n)
-			if orf:
-				if not info.next_ep_orf:
-					log(info, 'Expected " (nur ORF)" after next_ep_date')
-				next_date, next_name = orf[0]
-				check(info, 'next_episode', next_name)
-				check(info, 'next_ep_date', next_date)
-			else:
-				next = info_list[i+1]
-				if next.episode_number == n + 1:
-					check(info, 'next_episode', next.episode_name)
-					check(info, 'next_ep_date', next.infobox_date)
+
+		if info.tatort_folge:
+			print(ep2str(ep), info.infobox_date, info.episode_name,
+				info.tatort_folge.get('Url', ''), sep='|')
+
+		if info.double_episode:
+			ep = (ep[0], ep[1] + 1) if info.orf else (ep[0] + 1, 0)
+
+		next_ep = (ep[0], ep[1] + 1) if info.next_orf else (ep[0] + 1, 0)
+		prev = info
+
+	if prev:
+		check(prev, 'next_episode', EnDash)
+		check(prev, 'next_ep_date', EnDash)
 
 if __name__ == '__main__':
 	main()
