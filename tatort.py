@@ -38,6 +38,30 @@ class InputFile(object):
 
 	next = __next__
 
+REPLACE_WITH_DASH = re.compile('[^0-9a-z]+')
+TRANSLATION_TABLE = str.maketrans({
+	'ä': 'ae',
+	'ö': 'oe',
+	'ü': 'ue',
+	'ß': 'ss',
+	'â': 'a',
+	'à': 'a',
+	'é': 'e',
+	'ô': 'o',
+	'\u2019': None, # apostrophe (right single quotation mark)
+})
+
+def title2url(title):
+	url = title.lower().translate(TRANSLATION_TABLE)
+	url = REPLACE_WITH_DASH.sub('-', url)
+
+	if url[0] == '-':
+		url = url[1:]
+	if url[-1] == '-':
+		url = url[:-1]
+
+	return url
+
 def read_html():
 	expected_prefix1 = '<select name="filterBoxTitle" '
 	expected_prefix2 = '<option value="/">Bitte '
@@ -116,6 +140,22 @@ def read_wiki():
 
 	return wiki_episodes
 
+def urlmap():
+	wiki_titles = {}
+	with InputFile(TATORT_WIKI_EPISODES) as f:
+		for line in f:
+			ep, date, title, url = line.split('|')
+			wiki_titles[int(ep)] = title
+
+	for ep, (date, title, url) in enumerate(read_html(), start=1):
+		wiki_title = wiki_titles.get(ep)
+		if wiki_title is None:
+			continue
+		wiki_url = title2url(wiki_title) + '-'
+		url = url[:-3]
+		if url != wiki_url and url != 'tatort-' + wiki_url:
+			print(ep, url, sep='|')
+
 def html2txt():
 	html_episodes = read_html()
 	for ep, info in enumerate(html_episodes, start=1):
@@ -152,6 +192,7 @@ def main(args):
 		'diff': diff,
 		'fetch': fetch,
 		'html2txt': html2txt,
+		'urlmap': urlmap,
 	}
 	command = commands.get(args.pop(0) if args else 'html2txt')
 	if not command:
