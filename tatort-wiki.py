@@ -9,6 +9,30 @@ def log(info, format_spec, *args):
 def stringify(params):
 	return '|'.join(['='.join(p) for p in sorted(params.items())])
 
+Replace_With_Dash = re.compile('[^0-9a-z]+')
+Translation_Table = str.maketrans({
+	'ä': 'ae',
+	'ö': 'oe',
+	'ü': 'ue',
+	'ß': 'ss',
+	'â': 'a',
+	'à': 'a',
+	'é': 'e',
+	'ô': 'o',
+	'\u2019': None, # apostrophe (right single quotation mark)
+})
+
+def title2url(title):
+	url = title.lower().translate(Translation_Table)
+	url = Replace_With_Dash.sub('-', url)
+
+	if url[0] == '-':
+		url = url[1:]
+	if url[-1] == '-':
+		url = url[:-1]
+
+	return url
+
 EnDash = '\u2013'
 Months = {
 	'Januar':    1, 'Jan.':  1,
@@ -29,9 +53,12 @@ Months = {
 }
 Month_Days = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 Date_Pattern = re.compile('^(?:\\{\\{0\\}\\})?([1-9][0-9]?)\\.(?: |&nbsp;)([A-Z][a-zä]+\\.?) ([12][0-9]{3})')
+Double_Episode_Date = ('29. November und 6. Dezember 2020', '2020-11-29')
 Special_Dates = {
 	('Tatort: Borowski und die Frau am Fenster', 'Erstausstrahlung'): ('2. Oktober [[2011]]', '2011-10-02'),
-	('Tatort: In der Familie', 'Erstausstrahlung'): ('29. November und 6. Dezember 2020', '2020-11-29'),
+	('Tatort: Die Ferien des Monsieur Murot', 'NF-DATUM'): Double_Episode_Date,
+	('Tatort: In der Familie', 'Erstausstrahlung'): Double_Episode_Date,
+	('Tatort: Es lebe der König!', 'VG-DATUM'): Double_Episode_Date,
 }
 Alternate_Infobox_Dates = {
 	'Tatort: Exklusiv!': ('1969-10-26', '1971-07-11'),
@@ -89,7 +116,7 @@ Alternate_Titles = {
 	'Tatort: … es wird Trauer sein und Schmerz': '... es wird Trauer sein und Schmerz',
 }
 Episode_Number_Pattern = re.compile('^[1-9][0-9]*')
-PageName_Suffix_Pattern = re.compile('^ \\([ 0-9A-Za-z]+\\)$')
+PageName_Suffix_Pattern = re.compile('^ \\((?:[12][0-9]{3}|Film)\\)$')
 
 def get_episode_name(name):
 	if name.startswith('Tatort: '):
@@ -135,6 +162,8 @@ def do_folgenleiste(info, params):
 	info.next_orf = False
 	info.prev_episode = params.get('VG', '')
 	info.next_episode = params.get('NF', '')
+	info.prev_ep_page = params.get('VG-ARTIKEL')
+	info.next_ep_page = params.get('NF-ARTIKEL')
 	info.prev_ep_date = parse_date(params.get('VG-DATUM', ''), info, 'VG-DATUM')
 	info.next_ep_date = parse_date(params.get('NF-DATUM', ''), info, 'NF-DATUM')
 
@@ -225,21 +254,23 @@ def check_episode_number(info, ep):
 	ep = int(ep[:i])
 
 	if suffix == '':
-		suffix = 0
-	elif suffix == 'a':
-		suffix = 1
+		info.sortkey = (ep, 0)
+		return True
+	if suffix == 'a':
+		info.sortkey = (ep, 1)
 		info.orf = True
-	elif suffix == 'b':
-		suffix = 2
+		return True
+	if suffix == 'b':
+		info.sortkey = (ep, 2)
 		info.orf = True
-	elif suffix == ', ' + str(ep + 1):
-		suffix = 0
+		return True
+	if suffix == ', ' + str(ep + 1):
+		info.sortkey = (ep, 0)
+		info.episode_number = str(ep)
 		info.double_episode = True
-	else:
-		return False
+		return True
 
-	info.episode_number = (ep, suffix)
-	return True
+	return False
 
 def set_episode_number(info, ep):
 	if info.episode_number is None:
@@ -266,60 +297,39 @@ def do_infobox_film(info, params):
 		set_infobox_date(info, '2018-07-08')
 		set_episode_number(info, '1062')
 
-def default_tatort_template_title(page_name):
-	if page_name.startswith('Tatort: '):
-		return page_name[8:]
-	return page_name
-
-def do_tatort_template(info, params, info_attr, template, required_params):
-	saved = {}
-	for p in required_params:
-		v = params.get(p)
-		if v is not None:
-			del params[p]
-		if v:
-			saved[p] = v
-		else:
-			log(info, 'Missing {} parameter {}', template, p)
-
-	title = params.get('Titel')
-	if title is not None:
-		del params['Titel']
-		check_title(info, template, title)
-		if title != default_tatort_template_title(info.page_name):
-			saved['Titel'] = title
-	if params:
-		log(info, 'Extraneous {} parameters|{}|', template, stringify(params))
-
-	prev_params = getattr(info, info_attr)
-	if prev_params is None:
-		setattr(info, info_attr, saved)
-	elif prev_params == saved:
-		log(info, 'Skipping duplicate {}', template)
-	else:
-		prev_title = prev_params.pop('Titel', None)
-		title = saved.pop('Titel', None)
-		if prev_params == saved:
-			log(info, 'Skipping {} with different title|{}|{}|', template, prev_title, title)
-		else:
-			log(info, 'Skipping different {}', template)
-			log(info, '<<|{}|', stringify(prev_params))
-			log(info, '>>|{}|', stringify(saved))
-		if prev_title is not None:
-			prev_params['Titel'] = prev_title
-
 def do_tatort_fans(info, params):
-	do_tatort_template(info, params, 'tatort_fans', 'Tatort-Fans', ('Nr', 'Url'))
+	if info.tatort_fans is None:
+		info.tatort_fans = [params]
+	else:
+		info.tatort_fans.append(params)
 
 def do_tatort_folge(info, params):
-	url = params.get('Url', '')
-	if url.startswith('/'):
-		params['Url'] = url[1:]
-
-	do_tatort_template(info, params, 'tatort_folge', 'Tatort-Folge', ('Url',))
+	if info.tatort_folge is None:
+		info.tatort_folge = [params]
+	else:
+		info.tatort_folge.append(params)
 
 def do_tatort_fundus(info, params):
-	do_tatort_template(info, params, 'tatort_fundus', 'Tatort-Fundus', ('Jahr', 'Nr', 'Url'))
+	if info.tatort_fundus is None:
+		info.tatort_fundus = [params]
+	else:
+		info.tatort_fundus.append(params)
+
+Tatort_Fans_URL_Map = {}
+Tatort_Folge_URL_Map = {}
+Tatort_Fundus_URL_Map = {}
+
+def load_url_map(filename, lookup):
+	with open(filename) as f:
+		for line in f:
+			ep, url = line.split('|', maxsplit=1)
+			lookup[ep] = url[:-1]
+
+def check_url_map(info, url, expected_url, template, lookup):
+	mapped_url = lookup.get(info.episode_number)
+	if url != mapped_url:
+		log(info, 'Mismatched Tatort-{} URL|{}|{}|{}|', template, info.episode_number, url,
+			mapped_url or expected_url)
 
 Special_Tatort_Fans_Numbers = {
 	'Tatort: Angriff auf Wache 08': '1005', # instead of 1105
@@ -328,8 +338,12 @@ Special_Tatort_Fans_Numbers = {
 Special_Tatort_Fundus_Numbers = {
 	'Tatort: Wer jetzt allein ist': 'tatort-folge-1059', # instead of 1059
 }
-def check_tatort_nr(info, ep, params, template, lookup):
-	n = params.get('Nr', '')
+def check_tatort_nr(info, params, template, lookup):
+	n = params.pop('Nr', None)
+	if not n:
+		log(info, 'Missing Tatort-{} episode number', template)
+		return
+	ep = info.episode_number
 	if n == ep:
 		return
 	if n.startswith('0') and len(n) == 3 and n.lstrip('0') == ep:
@@ -338,12 +352,135 @@ def check_tatort_nr(info, ep, params, template, lookup):
 	if n != ep:
 		log(info, 'Mismatched Tatort-{} episode number|{}|{}|', template, n, ep)
 
+def default_tatort_template_title(page_name):
+	return page_name[8:] if page_name.startswith('Tatort: ') else page_name
+
+def check_tatort_fans(info):
+	default_title = default_tatort_template_title(info.page_name)
+	expected_url = title2url(info.episode_name)
+
+	for params in info.tatort_fans:
+		check_tatort_nr(info, params, 'Fans', Special_Tatort_Fans_Numbers)
+
+		url = params.pop('Url', '').lower()
+		if not url:
+			log(info, 'Missing Tatort-Fans URL')
+		elif url != expected_url:
+			check_url_map(info, url, expected_url, 'Fans', Tatort_Fans_URL_Map)
+
+		title = params.pop('Titel', None)
+		if title is not None:
+			check_title(info, 'Tatort-Fans', title)
+		elif info.episode_name != default_title:
+			log(info, 'Should specify Tatort-Fans title')
+
+		if params:
+			log(info, 'Extraneous Tatort-Fans parameters|{}|', stringify(params))
+
+def check_tatort_folge(info):
+	default_title = default_tatort_template_title(info.page_name)
+	expected_url = title2url(info.episode_name) + '-'
+	prev_url = None
+
+	for params in info.tatort_folge:
+		url = params.pop('Url', None)
+		if not url:
+			log(info, 'Missing Tatort-Folge URL')
+		elif not (len(url) > 3
+			and 49 <= ord(url[-3]) <= 50
+			and 48 <= ord(url[-2]) <= 57
+			and 48 <= ord(url[-1]) <= 57
+		):
+			log(info, 'Invalid Tatort-Folge URL suffix|{}|', url)
+		else:
+			if url[0] == '/':
+				url = url[1:]
+			if not prev_url:
+				prev_url = url
+			elif url != prev_url:
+				log(info, 'Tatort-Folge with different URL|{}|{}|', url, prev_url)
+			url = url[:-3]
+			if url != expected_url and url != 'tatort-' + expected_url:
+				check_url_map(info, url, expected_url, 'Folge', Tatort_Folge_URL_Map)
+
+		title = params.pop('Titel', None)
+		if title is not None:
+			check_title(info, 'Tatort-Folge', title)
+		elif info.episode_name != default_title:
+			log(info, 'Should specify Tatort-Folge title')
+
+		if params:
+			log(info, 'Extraneous Tatort-Folge parameters|{}|', stringify(params))
+
+	info.tatort_folge = prev_url
+
+def check_tatort_fundus(info):
+	default_title = default_tatort_template_title(info.page_name)
+	expected_url = title2url(info.episode_name)
+
+	for params in info.tatort_fundus:
+		year = params.pop('Jahr', None)
+		if not year:
+			log(info, 'Missing Tatort-Fundus year')
+		elif year != info.infobox_date[:4]:
+			log(info, 'Mismatched Tatort-Fundus year|{}|{}|', year, info.infobox_date[:4])
+
+		check_tatort_nr(info, params, 'Fundus', Special_Tatort_Fundus_Numbers)
+
+		url = params.pop('Url', None)
+		if not url:
+			log(info, 'Missing Tatort-Fundus URL')
+		else:
+			url_parts = url.split('/')
+			num_parts = len(url_parts)
+			if not (num_parts == 1 or num_parts == 2):
+				log(info, 'Invalid Tatort-Fundus URL|{}|', url)
+			else:
+				url = url_parts[0].lower().replace('_', '-')
+				if url != expected_url:
+					check_url_map(info, url, expected_url, 'Fundus', Tatort_Fundus_URL_Map)
+
+		title = params.pop('Titel', None)
+		if url and num_parts == 2:
+			if not (title and title.startswith(info.episode_name + ': ')):
+				log(info, 'Invalid Tatort-Fundus subpage title|{}|', title)
+			else:
+				url = url_parts[1]
+				subpage_url = title2url(title[len(info.episode_name) + 2:])
+				if url != subpage_url:
+					log(info, 'Mismatched Tatort-Fundus subpage URL|{}|{}|', url, subpage_url)
+		elif title is not None:
+			check_title(info, 'Tatort-Fundus', title)
+		elif info.episode_name != default_title:
+			log(info, 'Should specify Tatort-Fundus title')
+
+		if params:
+			log(info, 'Extraneous Tatort-Fundus parameters|{}|', stringify(params))
+
+def check_attr(info, attr, value):
+	if getattr(info, attr) != value:
+		log(info, 'Mismatched {}|{}|{}|', attr, getattr(info, attr), value)
+
+def check_link(info, attr, name):
+	link = getattr(info, attr + '_ep_page') or 'Tatort: ' + getattr(info, attr + '_episode')
+	if link != name and link != name.replace(' ', '_'):
+		log(info, 'Mismatched {}_ep_page|{}|{}|', attr, link, name)
+
+def ep2str(ep):
+	n, x = ep
+	ep = str(n)
+	return ep + chr(96 + x) if x else ep
+
 def get_pages():
 	site = pywikibot.Site(code='de')
 	return pywikibot.Page(site, 'Folgenleiste Tatort-Folgen', ns=Namespace.TEMPLATE).getReferences(
 		only_template_inclusion=True, namespaces=(Namespace.MAIN,))
 
 def main():
+	load_url_map('tatort-fans-url-map.txt', Tatort_Fans_URL_Map)
+	load_url_map('tatort-folge-url-map.txt', Tatort_Folge_URL_Map)
+	load_url_map('tatort-fundus-url-map.txt', Tatort_Fundus_URL_Map)
+
 	templates = {
 		'Folgenleiste Tatort-Folgen': do_folgenleiste,
 		'IMDb': do_imdb,
@@ -359,7 +496,6 @@ def main():
 	main_ns = Namespace.MAIN
 
 	for page in get_pages():
-		skip = False
 		info = TatortInfo(page.title())
 
 		ns = page.namespace()
@@ -393,69 +529,65 @@ def main():
 			log(info, 'Missing episode title')
 		if not info.infobox_date:
 			log(info, 'Missing episode date')
-			skip = True
+			continue
 		if info.prev_episode is None:
 			log(info, 'Missing Folgenleiste')
-			skip = True
+			continue
 
 		if info.imdb is None:
 			log(info, 'Missing IMDb')
 		if info.tatort_fans:
-			check_tatort_nr(info, ep, info.tatort_fans, 'Fans', Special_Tatort_Fans_Numbers)
+			check_tatort_fans(info)
 		elif not info.orf:
 			log(info, 'Missing Tatort-Fans')
+		if info.tatort_folge:
+			check_tatort_folge(info)
+		elif not info.orf:
+			log(info, 'Missing Tatort-Folge')
 		if info.tatort_fundus:
-			check_tatort_nr(info, ep, info.tatort_fundus, 'Fundus', Special_Tatort_Fundus_Numbers)
-		if not skip:
-			info_list.append(info)
+			check_tatort_fundus(info)
+
+		info_list.append(info)
 
 	for name, count in sorted(categories.items()):
 		print('CAT', '{:5}'.format(count), name, sep='|')
 
-	info_list.sort(key=lambda info: info.episode_number)
+	info_list.sort(key=lambda info: info.sortkey)
 	next_ep = (1, 0)
 	prev = None
 
-	def check(info, attr, value):
-		if getattr(info, attr) != value:
-			log(info, 'Mismatched {}|{}|{}|', attr, getattr(info, attr), value)
-
-	def ep2str(ep):
-		n, x = ep
-		ep = str(n)
-		return ep + chr(96 + x) if x else ep
-
 	for info in info_list:
-		ep = info.episode_number
+		ep = info.sortkey
 		if ep != next_ep:
 			log(info, 'Unexpected episode number|{}|{}', ep2str(ep), ep2str(next_ep))
 		elif prev:
 			if prev.orf != info.prev_orf:
 				log(info, '{}xpected " (nur ORF)" after prev_ep_date', 'E' if prev.orf else 'Une')
-			check(info, 'prev_episode', prev.episode_name)
-			check(info, 'prev_ep_date', prev.infobox_date)
+			check_attr(info, 'prev_episode', prev.episode_name)
+			check_attr(info, 'prev_ep_date', prev.infobox_date)
+			check_link(info, 'prev', prev.page_name)
 
 			if info.orf != prev.next_orf:
 				log(prev, '{}xpected " (nur ORF)" after next_ep_date', 'E' if info.orf else 'Une')
-			check(prev, 'next_episode', info.episode_name)
-			check(prev, 'next_ep_date', info.infobox_date)
+			check_attr(prev, 'next_episode', info.episode_name)
+			check_attr(prev, 'next_ep_date', info.infobox_date)
+			check_link(prev, 'next', info.page_name)
 		else:
-			check(info, 'prev_episode', EnDash)
-			check(info, 'prev_ep_date', EnDash)
+			check_attr(info, 'prev_episode', EnDash)
+			check_attr(info, 'prev_ep_date', EnDash)
 
 		if info.tatort_folge:
-			print(ep2str(ep), info.infobox_date, info.episode_name,
-				info.tatort_folge.get('Url', ''), sep='|')
+			print(info.episode_number, info.infobox_date, info.episode_name, info.tatort_folge, sep='|')
 
 		if info.double_episode:
-			ep = (ep[0], ep[1] + 1) if info.orf else (ep[0] + 1, 0)
+			ep = (ep[0] + 1, 0)
 
 		next_ep = (ep[0], ep[1] + 1) if info.next_orf else (ep[0] + 1, 0)
 		prev = info
 
 	if prev:
-		check(prev, 'next_episode', EnDash)
-		check(prev, 'next_ep_date', EnDash)
+		check_attr(prev, 'next_episode', EnDash)
+		check_attr(prev, 'next_ep_date', EnDash)
 
 if __name__ == '__main__':
 	main()
