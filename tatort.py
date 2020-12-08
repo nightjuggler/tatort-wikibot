@@ -94,7 +94,6 @@ def read_html():
 
 			if (date, title) in (
 				('2016-11-13', 'Sonntagsmörder'), # Sonntagsmörder – Ermittlung über 1000 Tatorte
-				('2017-01-22', 'Tatort: Schock'),
 			):
 				log('Skipping "{}" ({}) {}', title, date, url)
 				continue
