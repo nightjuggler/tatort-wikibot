@@ -1,5 +1,8 @@
+import random
 import re
+import subprocess
 import sys
+import time
 
 TATORT_HTML = 'tatort.html'
 TATORT_HTML_URL = 'https://www.daserste.de/unterhaltung/krimi/tatort/sendung/index.html'
@@ -62,6 +65,96 @@ def title2url(title):
 
 	return url
 
+def fans_html_url():
+	urls = [
+		'tatort-1970-1979',
+		'archiv-1980-1989',
+		'tatort-1990-1999',
+		'tatort-2000-2009',
+		'archiv-2010-2019',
+		'archiv-2020-202x',
+	]
+	for year in range(1970, 2021):
+		url = urls[year // 10 - 197]
+		year_str = str(year)
+		yield (
+			'tatort-fans/' + year_str + '.html',
+			'https://tatort-fans.de/category/' + url + '/' + year_str + '/',
+		)
+
+def fans_read_html():
+	episode_number_errors = {
+		'45-der-schwarze-skorpion': 456,
+		'456-einmal-taeglich': 457,
+		'674-nachtgefluester': 675,
+		'1005-angriff-auf-wache-08': 1105,
+	}
+	episode_number_pattern = re.compile('^(?:[1-9][0-9]{1,3}|0[0-9]{2})-')
+	episodes = []
+
+	for html, url in fans_html_url():
+		with InputFile(html) as f:
+			for line in f:
+				if 'entry-title' not in line:
+					continue
+				line = line.split('\"')[3]
+				if line[:30] != 'https://tatort-fans.de/tatort-':
+					log('{}, line {}: Unexpected URL prefix: {}', html, f.lineNumber, line)
+					continue
+				if line[-1] != '/':
+					log('{}, line {}: Unexpected URL suffix: {}', html, f.lineNumber, line)
+					continue
+				line = line[30:-1]
+				folge = False
+				if line[:6] == 'folge-':
+					folge = True
+					line = line[6:]
+				m = episode_number_pattern.match(line)
+				if not m:
+					log('{}, line {}: Episode number pattern doesn\'t match: {}',
+						html, f.lineNumber, line)
+					continue
+				i = m.end()
+				ep = episode_number_errors.get(line, int(line[:i-1]))
+				episodes.append((ep,  line[i:]))
+				if folge != (ep > 171) and ep not in (34, 55, 84, 129):
+					log('URL for episode {} has "folge-" prefix', line)
+
+	episodes.sort()
+	return episodes
+
+def fans_urlmap():
+	wiki_titles = {}
+	with InputFile(TATORT_WIKI_EPISODES) as f:
+		for line in f:
+			ep, date, title, url = line.split('|')
+			wiki_titles[int(ep)] = title
+
+	for ep, url in fans_read_html():
+		wiki_title = wiki_titles.get(ep)
+		if wiki_title is None:
+			continue
+		if url != title2url(wiki_title):
+			print(ep, url, sep='|')
+
+def fans_html2txt():
+	for ep, url in fans_read_html():
+		print(ep, url, sep='|')
+
+def fans_fetch():
+	for html, url in fans_html_url():
+		command = ['/usr/bin/curl', '-o', html, url]
+		print(*command, file=sys.stderr)
+		rc = subprocess.call(command)
+		if rc != 0:
+			err('Exit code', rc)
+
+		sleep_time = int(random.random() * 5 + 5.5)
+		print('Sleeping for', sleep_time, 'seconds', file=sys.stderr)
+		time.sleep(sleep_time)
+
+	fans_html2txt()
+
 def read_html():
 	expected_prefix1 = '<select name="filterBoxTitle" '
 	expected_prefix2 = '<option value="/">Bitte '
@@ -69,7 +162,7 @@ def read_html():
 	episode_pattern = re.compile('^<option value="([0-9a-z]+(?:-[0-9a-z]+)*-?[0-9]{3})">'
 		' *(.+) \\(([0-9]{2}\\.[0-9]{2}\\.[0-9]{4})\\)</option>$')
 
-	html_episodes = []
+	episodes = []
 	with InputFile(TATORT_HTML) as f:
 		for line in f:
 			if line.startswith(expected_prefix1):
@@ -104,14 +197,14 @@ def read_html():
 			elif (date, title) == ('1979-06-14', 'Ein Schuss zuviel'):
 				date = '1979-06-04'
 
-			html_episodes.append((date, title, url))
+			episodes.append((date, title, url))
 
-	html_episodes.append(('2017-06-18',
+	episodes.append(('2017-06-18',
 		'Borowski und das Fest des Nordens',
 		'borowski-und-das-fest-des-nordens-104'))
 
-	html_episodes.sort()
-	return html_episodes
+	episodes.sort()
+	return episodes
 
 def read_wiki():
 	title_map = {}
@@ -126,7 +219,7 @@ def read_wiki():
 	)
 	title_pattern = re.compile('[- !,.0-9:?A-Za-zÄÜäöüßâàéô' + special_chars + ']+')
 
-	wiki_episodes = {}
+	episodes = {}
 	with InputFile(TATORT_WIKI_EPISODES) as f:
 		for line in f:
 			ep, date, title, url = line.split('|')
@@ -135,9 +228,9 @@ def read_wiki():
 				log('Unexpected characters [{}] in "{}"',
 					', '.join(['U+{:04X}'.format(ord(ch)) for ch in unexpected_chars]), title)
 			title = title_map.get(title, title)
-			wiki_episodes[int(ep)] = (date, title, url[:-1])
+			episodes[int(ep)] = (date, title, url[:-1])
 
-	return wiki_episodes
+	return episodes
 
 def urlmap():
 	wiki_titles = {}
@@ -156,13 +249,10 @@ def urlmap():
 			print(ep, url, sep='|')
 
 def html2txt():
-	html_episodes = read_html()
-	for ep, info in enumerate(html_episodes, start=1):
+	for ep, info in enumerate(read_html(), start=1):
 		print(ep, *info, sep='|')
 
 def fetch():
-	import subprocess
-
 	command = ['/usr/bin/curl', '-o', TATORT_HTML, TATORT_HTML_URL]
 
 	rc = subprocess.call(command)
@@ -189,6 +279,9 @@ def diff():
 def main(args):
 	commands = {
 		'diff': diff,
+		'fans_fetch': fans_fetch,
+		'fans_html2txt': fans_html2txt,
+		'fans_urlmap': fans_urlmap,
 		'fetch': fetch,
 		'html2txt': html2txt,
 		'urlmap': urlmap,
