@@ -244,8 +244,10 @@ def urlmap():
 		if wiki_title is None:
 			continue
 		wiki_url = title2url(wiki_title) + '-'
+		if not (len(url) > 3 and url[-3] in '12' and url[-2] in '0123456789' and url[-1] in '02468'):
+			log('Unexpected URL suffix: "{}"', url)
 		url = url[:-3]
-		if url != wiki_url and url != 'tatort-' + wiki_url:
+		if url != wiki_url:
 			print(ep, url, sep='|')
 
 def html2txt():

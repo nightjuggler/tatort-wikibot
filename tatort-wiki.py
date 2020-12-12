@@ -325,15 +325,13 @@ def load_url_map(filename, lookup):
 			ep, url = line.split('|', maxsplit=1)
 			lookup[ep] = url[:-1]
 
-def check_url_map(info, url, expected_url, template, lookup):
-	mapped_url = lookup.get(info.episode_number)
-	if url != mapped_url:
-		log(info, 'Mismatched Tatort-{} URL|{}|{}|{}|', template, info.episode_number, url,
-			mapped_url or expected_url)
+def mismatched_url(info, url, expected_url, template):
+	log(info, 'Mismatched Tatort-{} URL|{}|{}|{}|', template, info.episode_number, url, expected_url)
 
 Special_Tatort_Fans_Numbers = {
 	'Tatort: Angriff auf Wache 08': '1005', # instead of 1105
 	'Tatort: Einmal täglich': '456', # instead of 457
+	'Tatort: Nachtgeflüster': '674', # instead of 675
 }
 Special_Tatort_Fundus_Numbers = {
 	'Tatort: Wer jetzt allein ist': 'tatort-folge-1059', # instead of 1059
@@ -343,21 +341,19 @@ def check_tatort_nr(info, params, template, lookup):
 	if not n:
 		log(info, 'Missing Tatort-{} episode number', template)
 		return
-	ep = info.episode_number
+	ep = lookup.get(info.page_name, info.episode_number)
 	if n == ep:
 		return
-	if n.startswith('0') and len(n) == 3 and n.lstrip('0') == ep:
+	if len(n) == 3 and n[0] == '0' and n.lstrip('0') == ep:
 		return
-	ep = lookup.get(info.page_name, ep)
-	if n != ep:
-		log(info, 'Mismatched Tatort-{} episode number|{}|{}|', template, n, ep)
+	log(info, 'Mismatched Tatort-{} episode number|{}|{}|', template, n, ep)
 
 def default_tatort_template_title(page_name):
 	return page_name[8:] if page_name.startswith('Tatort: ') else page_name
 
 def check_tatort_fans(info):
 	default_title = default_tatort_template_title(info.page_name)
-	expected_url = title2url(info.episode_name)
+	expected_url = Tatort_Fans_URL_Map.get(info.episode_number, title2url(info.episode_name))
 
 	for params in info.tatort_fans:
 		check_tatort_nr(info, params, 'Fans', Special_Tatort_Fans_Numbers)
@@ -366,7 +362,7 @@ def check_tatort_fans(info):
 		if not url:
 			log(info, 'Missing Tatort-Fans URL')
 		elif url != expected_url:
-			check_url_map(info, url, expected_url, 'Fans', Tatort_Fans_URL_Map)
+			mismatched_url(info, url, expected_url, 'Fans')
 
 		title = params.pop('Titel', None)
 		if title is not None:
@@ -379,7 +375,7 @@ def check_tatort_fans(info):
 
 def check_tatort_folge(info):
 	default_title = default_tatort_template_title(info.page_name)
-	expected_url = title2url(info.episode_name) + '-'
+	expected_url = Tatort_Folge_URL_Map.get(info.episode_number, title2url(info.episode_name) + '-')
 	prev_url = None
 
 	for params in info.tatort_folge:
@@ -400,8 +396,8 @@ def check_tatort_folge(info):
 			elif url != prev_url:
 				log(info, 'Tatort-Folge with different URL|{}|{}|', url, prev_url)
 			url = url[:-3]
-			if url != expected_url and url != 'tatort-' + expected_url:
-				check_url_map(info, url, expected_url, 'Folge', Tatort_Folge_URL_Map)
+			if url != expected_url:
+				mismatched_url(info, url, expected_url, 'Folge')
 
 		title = params.pop('Titel', None)
 		if title is not None:
@@ -416,7 +412,7 @@ def check_tatort_folge(info):
 
 def check_tatort_fundus(info):
 	default_title = default_tatort_template_title(info.page_name)
-	expected_url = title2url(info.episode_name)
+	expected_url = Tatort_Fundus_URL_Map.get(info.episode_number, title2url(info.episode_name))
 
 	for params in info.tatort_fundus:
 		year = params.pop('Jahr', None)
@@ -433,12 +429,12 @@ def check_tatort_fundus(info):
 		else:
 			url_parts = url.split('/')
 			num_parts = len(url_parts)
-			if not (num_parts == 1 or num_parts == 2):
+			if num_parts != 1 and num_parts != 2:
 				log(info, 'Invalid Tatort-Fundus URL|{}|', url)
 			else:
 				url = url_parts[0].lower().replace('_', '-')
 				if url != expected_url:
-					check_url_map(info, url, expected_url, 'Fundus', Tatort_Fundus_URL_Map)
+					mismatched_url(info, url, expected_url, 'Fundus')
 
 		title = params.pop('Titel', None)
 		if url and num_parts == 2:

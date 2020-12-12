@@ -6,3 +6,6 @@
 * `python3 tatort.py fetch > tatort-html-episodes.txt`
 * `python3 tatort.py diff`
 
+* `python3 tatort.py fans_fetch > tatort-fans-episodes.txt`
+* `python3 tatort.py fans_urlmap | diff tatort-fans-url-map.txt -`
+* `python3 tatort.py urlmap | diff tatort-folge-url-map.txt -`
