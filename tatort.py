@@ -1,3 +1,4 @@
+import os.path
 import random
 import re
 import subprocess
@@ -65,7 +66,11 @@ def title2url(title):
 
 	return url
 
-def fans_html_url():
+def fans_html_url(start=None, end=None):
+	if not start:
+		start = 1970
+	if not end:
+		end = time.gmtime().tm_year + 1
 	urls = [
 		'tatort-1970-1979',
 		'archiv-1980-1989',
@@ -74,7 +79,7 @@ def fans_html_url():
 		'archiv-2010-2019',
 		'archiv-2020-202x',
 	]
-	for year in range(1970, 2021):
+	for year in range(start, end + 1):
 		url = urls[year // 10 - 197]
 		year_str = str(year)
 		yield (
@@ -93,6 +98,8 @@ def fans_read_html():
 	episodes = []
 
 	for html, url in fans_html_url():
+		if not os.path.exists(html):
+			continue
 		with InputFile(html) as f:
 			for line in f:
 				if 'entry-title' not in line:
@@ -141,17 +148,47 @@ def fans_html2txt():
 	for ep, url in fans_read_html():
 		print(ep, url, sep='|')
 
-def fans_fetch():
-	for html, url in fans_html_url():
+def parse_fans_year(arg, arg_name, min_year, max_year):
+	try:
+		year = int(arg)
+		if min_year <= year <= max_year:
+			return year
+	except ValueError:
+		pass
+
+	err('The {} year must be a number between {} and {}.', arg_name, min_year, max_year)
+
+def parse_fans_fetch_args(args):
+	if not args:
+		return (None, None)
+
+	end = time.gmtime().tm_year + 1
+
+	start = parse_fans_year(args.pop(0), 'start', 1970, end)
+	if not args:
+		return (start, start)
+
+	end = parse_fans_year(args.pop(0), 'end', start, end)
+	if not args:
+		return (start, end)
+
+	err('Too many command-line arguments!')
+
+def fans_fetch(args):
+	start, end = parse_fans_fetch_args(args)
+
+	rc = 1
+	for html, url in fans_html_url(start, end):
+		if rc == 0:
+			sleep_time = int(random.random() * 5 + 5.5)
+			print('Sleeping for', sleep_time, 'seconds', file=sys.stderr)
+			time.sleep(sleep_time)
+
 		command = ['/usr/bin/curl', '-o', html, url]
 		print(*command, file=sys.stderr)
 		rc = subprocess.call(command)
 		if rc != 0:
 			err('Exit code', rc)
-
-		sleep_time = int(random.random() * 5 + 5.5)
-		print('Sleeping for', sleep_time, 'seconds', file=sys.stderr)
-		time.sleep(sleep_time)
 
 	fans_html2txt()
 
@@ -291,7 +328,10 @@ def main(args):
 	command = commands.get(args.pop(0) if args else 'html2txt')
 	if not command:
 		err('Please specify a valid command.')
-	command()
+	if command.__code__.co_argcount == 1:
+		command(args)
+	else:
+		command()
 
 if __name__ == '__main__':
 	main(sys.argv[1:])
