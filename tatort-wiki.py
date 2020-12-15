@@ -160,12 +160,14 @@ def do_folgenleiste(info, params):
 
 	info.prev_orf = False
 	info.next_orf = False
-	info.prev_episode = params.get('VG', '')
-	info.next_episode = params.get('NF', '')
-	info.prev_ep_page = params.get('VG-ARTIKEL')
-	info.next_ep_page = params.get('NF-ARTIKEL')
-	info.prev_ep_date = parse_date(params.get('VG-DATUM', ''), info, 'VG-DATUM')
-	info.next_ep_date = parse_date(params.get('NF-DATUM', ''), info, 'NF-DATUM')
+	info.prev_episode = params.pop('VG', '')
+	info.next_episode = params.pop('NF', '')
+	info.prev_ep_page = params.pop('VG-ARTIKEL', None)
+	info.next_ep_page = params.pop('NF-ARTIKEL', None)
+	info.prev_ep_date = parse_date(params.pop('VG-DATUM', ''), info, 'VG-DATUM')
+	info.next_ep_date = parse_date(params.pop('NF-DATUM', ''), info, 'NF-DATUM')
+	if params:
+		log(info, 'Extraneous Folgenleiste parameters|{}|', stringify(params))
 
 def do_imdb(info, params):
 	if info.imdb is not None:
