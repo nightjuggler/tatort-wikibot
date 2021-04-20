@@ -49,7 +49,6 @@ Months = {
 	'Dezember': 12, 'Dez.': 12,
 
 	'Jänner':    1, # Tatort: Die Faust (Parameter 'EAS' in Vorlage 'Infobox Episode')
-	'Juni.':     6, # Tatort: Durchgedreht (Parameter 'VG-DATUM' in Vorlage 'Folgenleiste Tatort-Folgen')
 }
 Month_Days = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 Date_Pattern = re.compile('^(?:\\{\\{0\\}\\})?([1-9][0-9]?)\\.(?: |&nbsp;)([A-Z][a-zä]+\\.?) ([12][0-9]{3})')
@@ -106,7 +105,7 @@ def parse_date(date, info, param):
 	return '{}-{:02}-{:02}'.format(year, month, day)
 
 Alternate_Titles = {
-	'Tatort: Acht, neun – aus': 'Acht, Neun – aus!',
+	'Tatort: Acht, neun – aus': 'Acht, neun – aus!',
 	'Tatort: Aus der Traum (2006)': 'Aus der Traum …',
 	'Tatort: Die schlafende Schöne': 'Die Schlafende Schöne',
 	'Tatort: Laura mein Engel': 'Laura, mein Engel',
@@ -241,7 +240,11 @@ def get_infobox_date(info, params):
 		if not date:
 			date = v
 			date_param = p
-		elif date != v:
+			if p[-2:] == 'DE':
+				log(info, 'Use EAS/Erstausstrahlung instead of {}', p)
+		elif date == v:
+			log(info, 'Duplicate Infobox date|{}|{}', date_param, p)
+		else:
 			log(info, '{} and {} are different', p, date_param)
 
 	return set_infobox_date(info, date)
@@ -288,6 +291,9 @@ def do_infobox_episode(info, params):
 	elif series:
 		log(info, 'Skipping Infobox for another series|{}|', series)
 		return
+
+	if 'Serienlogo' in params:
+		log(info, 'Should remove Infobox parameter Serienlogo')
 
 	get_infobox_title(info, params)
 	get_infobox_date(info, params)
