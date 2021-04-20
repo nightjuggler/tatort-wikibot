@@ -197,7 +197,7 @@ def read_html():
 	expected_prefix2 = '<option value="/">Bitte '
 	expected_prefix3 = '</select>'
 	episode_pattern = re.compile('^<option value="([0-9a-z]+(?:-[0-9a-z]+)*-?[0-9]{3})">'
-		' *(.+) \\(([0-9]{2}\\.[0-9]{2}\\.[0-9]{4})\\)</option>$')
+		' *([^ ]+(?: [^ ]+)*) +\\(([0-9]{2}\\.[0-9]{2}\\.[0-9]{4})\\)</option>$')
 
 	episodes = []
 	with InputFile(TATORT_HTML) as f:
@@ -227,6 +227,15 @@ def read_html():
 			):
 				log('Skipping "{}" ({}) {}', title, date, url)
 				continue
+			if (date, title, url) in (
+				('2018-09-16', 'Tiere der Großstadt', 'tiere-der-grossstadt-104'),
+				('2019-03-31', 'Tatort: Bombengeschäft', 'bombengeschaeft-116'),
+				('2019-05-26', 'Die ewige Welle', 'die-ewige-welle-168'),
+				('2019-11-17', 'Tatort: Die Pfalz von oben', 'die-pfalz-von-oben-102'),
+				('2020-04-13', 'Tatort: Das fleißige Lieschen', 'das-fleissige-lieschen-102'),
+			):
+				log('Skipping "{}" ({}) {}', title, date, url)
+				continue
 			if (date, title) == ('2014-12-12', 'Der Maulwurf'):
 				date = '2014-12-21'
 			elif (date, title) == ('1980-02-17', 'Der gelbe Unterrock'):
@@ -235,10 +244,6 @@ def read_html():
 				date = '1979-06-04'
 
 			episodes.append((date, title, url))
-
-	episodes.append(('2017-06-18',
-		'Borowski und das Fest des Nordens',
-		'borowski-und-das-fest-des-nordens-104'))
 
 	episodes.sort()
 	return episodes
