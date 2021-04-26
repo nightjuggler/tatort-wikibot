@@ -8,16 +8,17 @@ import time
 class TatortSpec(object):
 	html = 'tatort.html'
 	url = 'https://www.daserste.de/unterhaltung/krimi/tatort/sendung/index.html'
+	prefix = 'Tatort: '
 	title_map = 'tatort-title-map.txt'
 	wiki_episodes = 'tatort-wiki-episodes.txt'
-	skip = frozenset((
+	skip = set((
 		('2016-11-13', 'Sonntagsmörder', 'sonntagsmoerder-106'),
-		('2018-05-21', 'Tatort: Wer jetzt allein ist', 'wer-jetzt-allein-ist-102'),
+		('2018-05-21', 'Wer jetzt allein ist', 'wer-jetzt-allein-ist-102'),
 		('2019-01-01', 'Der höllische Heinz', 'der-hoellische-heinz-102'),
-		('2019-03-31', 'Tatort: Bombengeschäft', 'bombengeschaeft-116'),
+		('2019-03-31', 'Bombengeschäft', 'bombengeschaeft-116'),
 		('2019-05-26', 'Die ewige Welle', 'die-ewige-welle-168'),
-		('2019-11-17', 'Tatort: Die Pfalz von oben', 'die-pfalz-von-oben-102'),
-		('2020-04-13', 'Tatort: Das fleißige Lieschen', 'das-fleissige-lieschen-102'),
+		('2019-11-17', 'Die Pfalz von oben', 'die-pfalz-von-oben-102'),
+		('2020-04-13', 'Das fleißige Lieschen', 'das-fleissige-lieschen-102'),
 	))
 	change_date = {
 		('2014-12-12', 'Der Maulwurf'): '2014-12-21',
@@ -27,13 +28,13 @@ class TatortSpec(object):
 	add = (
 	)
 
-
 class PolizeirufSpec(object):
 	html = 'polizeiruf110.html'
 	url = 'https://www.daserste.de/unterhaltung/krimi/polizeiruf-110/sendung/index.html'
+	prefix = 'Polizeiruf 110: '
 	title_map = 'polizeiruf110-title-map.txt'
 	wiki_episodes = 'polizeiruf110-wiki-episodes.txt'
-	skip = frozenset((
+	skip = set((
 		('1985-01-27', 'Außenseiter', 'aussenseiter-100'),
 		('2011-06-23', 'Im Alter von ...', 'im-alter-von-100'),
 		('2016-09-11', 'Wölfe', 'woelfe-116'),
@@ -260,16 +261,22 @@ def read_html(spec):
 
 			url, title, date = m.groups()
 			date = '-'.join(reversed(date.split('.')))
+			title = title.removeprefix(spec.prefix)
+			info = (date, title, url)
 
-			if (date, title, url) in spec.skip:
-				log('Skipping "{}" ({}) {}', title, date, url)
+			if info in spec.skip:
+				spec.skip.remove(info)
 				continue
-			new_date = spec.change_date.get((date, title))
-			if new_date:
-				log('Changing date for "{}" from {} to {}', title, date, new_date)
-				date = new_date
+			date = spec.change_date.pop((date, title), None)
+			if date:
+				info = (date, title, url)
 
-			episodes.append((date, title, url))
+			episodes.append(info)
+
+	for date, title, url in spec.skip:
+		log('Could not skip "{}" ({}) {}', title, date, url)
+	for date, title in spec.change_date:
+		log('Could not change date for "{}" ({})', title, date)
 
 	episodes.extend(spec.add)
 	episodes.sort()
@@ -320,8 +327,15 @@ def urlmap(spec):
 			print(ep, url, sep='|')
 
 def html2txt(spec):
-	for ep, info in enumerate(read_html(spec), start=1):
-		print(ep, *info, sep='|')
+	ep = 0
+	prev_date = None
+	prev_title = None
+	for date, title, url in read_html(spec):
+		if date != prev_date or title != prev_title:
+			ep += 1
+			prev_date = date
+			prev_title = title
+		print(ep, date, title, url, sep='|')
 
 def fetch(spec):
 	command = ['/usr/bin/curl', '-o', spec.html, spec.url]
@@ -352,8 +366,10 @@ def tatort_fetch(): fetch(TatortSpec)
 def tatort_html2txt(): html2txt(TatortSpec)
 def tatort_urlmap(): urlmap(TatortSpec)
 
+def polizeiruf_diff(): diff(PolizeirufSpec)
 def polizeiruf_fetch(): fetch(PolizeirufSpec)
 def polizeiruf_html2txt(): html2txt(PolizeirufSpec)
+def polizeiruf_urlmap(): urlmap(PolizeirufSpec)
 
 def main(args):
 	commands = {
@@ -364,8 +380,10 @@ def main(args):
 		'tatort_fetch': tatort_fetch,
 		'tatort_html2txt': tatort_html2txt,
 		'tatort_urlmap': tatort_urlmap,
+		'polizeiruf_diff': polizeiruf_diff,
 		'polizeiruf_fetch': polizeiruf_fetch,
 		'polizeiruf_html2txt': polizeiruf_html2txt,
+		'polizeiruf_urlmap': polizeiruf_urlmap,
 	}
 	command = commands.get(args.pop(0) if args else 'tatort_html2txt')
 	if not command:
