@@ -5,10 +5,49 @@ import subprocess
 import sys
 import time
 
-TATORT_HTML = 'tatort.html'
-TATORT_HTML_URL = 'https://www.daserste.de/unterhaltung/krimi/tatort/sendung/index.html'
-TATORT_TITLE_MAP = 'tatort-title-map.txt'
-TATORT_WIKI_EPISODES = 'tatort-wiki-episodes.txt'
+class TatortSpec(object):
+	html = 'tatort.html'
+	url = 'https://www.daserste.de/unterhaltung/krimi/tatort/sendung/index.html'
+	title_map = 'tatort-title-map.txt'
+	wiki_episodes = 'tatort-wiki-episodes.txt'
+	skip = frozenset((
+		('2016-11-13', 'Sonntagsmörder', 'sonntagsmoerder-106'),
+		('2018-05-21', 'Tatort: Wer jetzt allein ist', 'wer-jetzt-allein-ist-102'),
+		('2019-01-01', 'Der höllische Heinz', 'der-hoellische-heinz-102'),
+		('2019-03-31', 'Tatort: Bombengeschäft', 'bombengeschaeft-116'),
+		('2019-05-26', 'Die ewige Welle', 'die-ewige-welle-168'),
+		('2019-11-17', 'Tatort: Die Pfalz von oben', 'die-pfalz-von-oben-102'),
+		('2020-04-13', 'Tatort: Das fleißige Lieschen', 'das-fleissige-lieschen-102'),
+	))
+	change_date = {
+		('2014-12-12', 'Der Maulwurf'): '2014-12-21',
+		('1980-02-17', 'Der gelbe Unterrock'): '1980-02-10',
+		('1979-06-14', 'Ein Schuss zuviel'): '1979-06-04',
+	}
+	add = (
+	)
+
+
+class PolizeirufSpec(object):
+	html = 'polizeiruf110.html'
+	url = 'https://www.daserste.de/unterhaltung/krimi/polizeiruf-110/sendung/index.html'
+	title_map = 'polizeiruf110-title-map.txt'
+	wiki_episodes = 'polizeiruf110-wiki-episodes.txt'
+	skip = frozenset((
+		('1985-01-27', 'Außenseiter', 'aussenseiter-100'),
+		('2011-06-23', 'Im Alter von ...', 'im-alter-von-100'),
+		('2016-09-11', 'Wölfe', 'woelfe-116'),
+		('2018-06-10', 'In Flammen', 'in-flammen-104'),
+		('2019-12-08', 'Die Lüge, die wir Zukunft nennen (FSK 16)', 'die-luege-die-wir-zukunft-nennen-154'),
+	))
+	change_date = {
+	}
+	add = (
+		('1979-12-02', 'Die letzte Fahrt', ''),
+		('1981-11-29', 'Glassplitter', 'glassplitter-100'),
+		('1989-02-19', 'Variante Tramper', 'variante-tramper-100'),
+		('2016-11-27', 'Sumpfgebiete', 'sumpfgebiete-110'),
+	)
 
 def log(message, *args, **kwargs):
 	print(message.format(*args, **kwargs), file=sys.stderr)
@@ -132,7 +171,7 @@ def fans_read_html():
 
 def fans_urlmap():
 	wiki_titles = {}
-	with InputFile(TATORT_WIKI_EPISODES) as f:
+	with InputFile(TatortSpec.wiki_episodes) as f:
 		for line in f:
 			ep, date, title, url = line.split('|')
 			wiki_titles[int(ep)] = title
@@ -192,15 +231,15 @@ def fans_fetch(args):
 
 	fans_html2txt()
 
-def read_html():
+def read_html(spec):
 	expected_prefix1 = '<select name="filterBoxTitle" '
 	expected_prefix2 = '<option value="/">Bitte '
 	expected_prefix3 = '</select>'
 	episode_pattern = re.compile('^<option value="([0-9a-z]+(?:-[0-9a-z]+)*-?[0-9]{3})">'
-		' *([^ ]+(?: [^ ]+)*) +\\(([0-9]{2}\\.[0-9]{2}\\.[0-9]{4})\\)</option>$')
+		' *([^ ]+(?: +[^ ]+)*) +\\(([0-9]{2}\\.[0-9]{2}\\.[0-9]{4})\\)</option>$')
 
 	episodes = []
-	with InputFile(TATORT_HTML) as f:
+	with InputFile(spec.html) as f:
 		for line in f:
 			if line.startswith(expected_prefix1):
 				break
@@ -222,35 +261,23 @@ def read_html():
 			url, title, date = m.groups()
 			date = '-'.join(reversed(date.split('.')))
 
-			if (date, title) in (
-				('2016-11-13', 'Sonntagsmörder'), # Sonntagsmörder – Ermittlung über 1000 Tatorte
-			):
+			if (date, title, url) in spec.skip:
 				log('Skipping "{}" ({}) {}', title, date, url)
 				continue
-			if (date, title, url) in (
-				('2018-09-16', 'Tiere der Großstadt', 'tiere-der-grossstadt-104'),
-				('2019-03-31', 'Tatort: Bombengeschäft', 'bombengeschaeft-116'),
-				('2019-05-26', 'Die ewige Welle', 'die-ewige-welle-168'),
-				('2019-11-17', 'Tatort: Die Pfalz von oben', 'die-pfalz-von-oben-102'),
-				('2020-04-13', 'Tatort: Das fleißige Lieschen', 'das-fleissige-lieschen-102'),
-			):
-				log('Skipping "{}" ({}) {}', title, date, url)
-				continue
-			if (date, title) == ('2014-12-12', 'Der Maulwurf'):
-				date = '2014-12-21'
-			elif (date, title) == ('1980-02-17', 'Der gelbe Unterrock'):
-				date = '1980-02-10'
-			elif (date, title) == ('1979-06-14', 'Ein Schuss zuviel'):
-				date = '1979-06-04'
+			new_date = spec.change_date.get((date, title))
+			if new_date:
+				log('Changing date for "{}" from {} to {}', title, date, new_date)
+				date = new_date
 
 			episodes.append((date, title, url))
 
+	episodes.extend(spec.add)
 	episodes.sort()
 	return episodes
 
-def read_wiki():
+def read_wiki(spec):
 	title_map = {}
-	with InputFile(TATORT_TITLE_MAP) as f:
+	with InputFile(spec.title_map) as f:
 		for line in f:
 			title_map[line[:-1]] = f.next()[:-1]
 
@@ -262,7 +289,7 @@ def read_wiki():
 	title_pattern = re.compile('[- !,.0-9:?A-Za-zÄÜäöüßâàéô' + special_chars + ']+')
 
 	episodes = {}
-	with InputFile(TATORT_WIKI_EPISODES) as f:
+	with InputFile(spec.wiki_episodes) as f:
 		for line in f:
 			ep, date, title, url = line.split('|')
 			unexpected_chars = title_pattern.sub('', title)
@@ -274,14 +301,14 @@ def read_wiki():
 
 	return episodes
 
-def urlmap():
+def urlmap(spec):
 	wiki_titles = {}
-	with InputFile(TATORT_WIKI_EPISODES) as f:
+	with InputFile(spec.wiki_episodes) as f:
 		for line in f:
 			ep, date, title, url = line.split('|')
 			wiki_titles[int(ep)] = title
 
-	for ep, (date, title, url) in enumerate(read_html(), start=1):
+	for ep, (date, title, url) in enumerate(read_html(spec), start=1):
 		wiki_title = wiki_titles.get(ep)
 		if wiki_title is None:
 			continue
@@ -292,22 +319,22 @@ def urlmap():
 		if url != wiki_url:
 			print(ep, url, sep='|')
 
-def html2txt():
-	for ep, info in enumerate(read_html(), start=1):
+def html2txt(spec):
+	for ep, info in enumerate(read_html(spec), start=1):
 		print(ep, *info, sep='|')
 
-def fetch():
-	command = ['/usr/bin/curl', '-o', TATORT_HTML, TATORT_HTML_URL]
+def fetch(spec):
+	command = ['/usr/bin/curl', '-o', spec.html, spec.url]
 
 	rc = subprocess.call(command)
 	if rc != 0:
 		err('Exit code', rc)
 
-	html2txt()
+	html2txt(spec)
 
-def diff():
-	wiki_episodes = read_wiki()
-	html_episodes = read_html()
+def diff(spec):
+	wiki_episodes = read_wiki(spec)
+	html_episodes = read_html(spec)
 
 	for ep, info in enumerate(html_episodes, start=1):
 		wiki_info = wiki_episodes.get(ep)
@@ -320,17 +347,27 @@ def diff():
 			if value != wiki_value:
 				print('MOD', ep, name, wiki_value, value, sep='|')
 
+def tatort_diff(): diff(TatortSpec)
+def tatort_fetch(): fetch(TatortSpec)
+def tatort_html2txt(): html2txt(TatortSpec)
+def tatort_urlmap(): urlmap(TatortSpec)
+
+def polizeiruf_fetch(): fetch(PolizeirufSpec)
+def polizeiruf_html2txt(): html2txt(PolizeirufSpec)
+
 def main(args):
 	commands = {
-		'diff': diff,
 		'fans_fetch': fans_fetch,
 		'fans_html2txt': fans_html2txt,
 		'fans_urlmap': fans_urlmap,
-		'fetch': fetch,
-		'html2txt': html2txt,
-		'urlmap': urlmap,
+		'tatort_diff': tatort_diff,
+		'tatort_fetch': tatort_fetch,
+		'tatort_html2txt': tatort_html2txt,
+		'tatort_urlmap': tatort_urlmap,
+		'polizeiruf_fetch': polizeiruf_fetch,
+		'polizeiruf_html2txt': polizeiruf_html2txt,
 	}
-	command = commands.get(args.pop(0) if args else 'html2txt')
+	command = commands.get(args.pop(0) if args else 'tatort_html2txt')
 	if not command:
 		err('Please specify a valid command.')
 	if command.__code__.co_argcount == 1:
