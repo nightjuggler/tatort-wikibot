@@ -13,11 +13,8 @@ class TatortSpec(object):
 	wiki_episodes = 'tatort-wiki-episodes.txt'
 	skip = set((
 		('2016-11-13', 'Sonntagsmörder', 'sonntagsmoerder-106'),
-		('2018-05-21', 'Wer jetzt allein ist', 'wer-jetzt-allein-ist-102'),
-		('2019-01-01', 'Der höllische Heinz', 'der-hoellische-heinz-102'),
 		('2019-03-31', 'Bombengeschäft', 'bombengeschaeft-116'),
 		('2019-05-26', 'Die ewige Welle', 'die-ewige-welle-168'),
-		('2019-11-17', 'Die Pfalz von oben', 'die-pfalz-von-oben-102'),
 		('2020-04-13', 'Das fleißige Lieschen', 'das-fleissige-lieschen-102'),
 	))
 	change_date = {
@@ -42,12 +39,12 @@ class PolizeirufSpec(object):
 		('2019-12-08', 'Die Lüge, die wir Zukunft nennen (FSK 16)', 'die-luege-die-wir-zukunft-nennen-154'),
 	))
 	change_date = {
+		('2012-04-18', 'Raubvögel'): '2012-03-18',
 	}
 	add = (
 		('1979-12-02', 'Die letzte Fahrt', ''),
 		('1981-11-29', 'Glassplitter', 'glassplitter-100'),
 		('1989-02-19', 'Variante Tramper', 'variante-tramper-100'),
-		('2016-11-27', 'Sumpfgebiete', 'sumpfgebiete-110'),
 	)
 
 def log(message, *args, **kwargs):
@@ -293,7 +290,7 @@ def read_wiki(spec):
 		'\u2019' # apostrophe (right single quotation mark)
 		'\u2026' # ellipsis
 	)
-	title_pattern = re.compile('[- !,.0-9:?A-Za-zÄÜäöüßâàéô' + special_chars + ']+')
+	title_pattern = re.compile('[- !(),.0-9:?A-Za-zÄÜäöüßâàéô' + special_chars + ']+')
 
 	episodes = {}
 	with InputFile(spec.wiki_episodes) as f:
@@ -322,6 +319,7 @@ def urlmap(spec):
 		wiki_url = title2url(wiki_title) + '-'
 		if not (len(url) > 3 and url[-3] in '12' and url[-2] in '0123456789' and url[-1] in '02468'):
 			log('Unexpected URL suffix: "{}"', url)
+			continue
 		url = url[:-3]
 		if url != wiki_url:
 			print(ep, url, sep='|')
@@ -353,13 +351,22 @@ def diff(spec):
 	for ep, info in enumerate(html_episodes, start=1):
 		wiki_info = wiki_episodes.get(ep)
 		if not wiki_info:
-			print('ADD', ep, *info, sep='|')
+			print(ep, 'ADD', *info, sep='|')
 			continue
 		if wiki_info == info:
 			continue
-		for name, value, wiki_value in zip(('DATE', 'TITLE', 'URL'), info, wiki_info):
-			if value != wiki_value:
-				print('MOD', ep, name, wiki_value, value, sep='|')
+		date1, title1, url1 = info
+		date2, title2, url2 = wiki_info
+		if date1 != date2:
+			print(ep, 'MOD-DATE', date2, date1, sep='|')
+		if title1 != title2:
+			print(ep, 'MOD-TITLE', title2, title1, sep='|')
+		if not url2:
+			print(ep, 'ADD-URL', url1, sep='|')
+			continue
+		urls = url2.split(',')
+		if url1 not in urls:
+			print(ep, 'MOD-URL', url2, url1, sep='|')
 
 def tatort_diff(): diff(TatortSpec)
 def tatort_fetch(): fetch(TatortSpec)

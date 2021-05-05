@@ -69,7 +69,7 @@ def parse_date(date, info, param):
 			if date == special[0]:
 				return special[1]
 		elif date in ('', EnDash) and param in ('VG-DATUM', 'NF-DATUM'):
-			return EnDash
+			return ''
 		log(info, 'Cannot parse date|{}={}|', param, date)
 		return ''
 	extra = date[m.end():]
@@ -259,6 +259,29 @@ def do_infobox_episode(info, params):
 	get_infobox_title(info, params)
 	get_infobox_date(info, params)
 
+URL_Prefix = 'www.daserste.de/unterhaltung/krimi/polizeiruf-110/sendung/'
+URL_Suffix_Pattern = re.compile('^(?:[0-9]{4}/)?([0-9a-z]+(?:-[0-9a-z]+)*-?[0-9]{3})\\.html$')
+
+def get_urls(info, page):
+	urls = []
+	for url in page.extlinks():
+		if url.startswith('https://'):
+			url = url[8:]
+		elif url.startswith('http://'):
+			url = url[7:]
+		else:
+			log(info, 'Unexpected URL protocol|{}', url)
+			continue
+		if not url.startswith(URL_Prefix):
+			continue
+		url = url[len(URL_Prefix):]
+		m = URL_Suffix_Pattern.match(url)
+		if not m:
+			log(info, 'Unexpected URL suffix|{}', url)
+			continue
+		urls.append(m.group(1))
+	info.url = ','.join(urls)
+
 def check_attr(info, attr, value):
 	if getattr(info, attr) != value:
 		log(info, 'Mismatched {}|{}|{}|', attr, getattr(info, attr), value)
@@ -326,6 +349,8 @@ def main():
 		if info.imdb is None:
 			log(info, 'Missing IMDb')
 
+		get_urls(info, page)
+
 		info_list.append(info)
 
 	for name, count in sorted(categories.items()):
@@ -348,20 +373,22 @@ def main():
 			check_attr(prev, 'next_ep_date', info.infobox_date)
 			check_link(prev, 'next', info.page_name)
 		else:
-			check_attr(info, 'prev_episode', EnDash)
-			check_attr(info, 'prev_ep_date', EnDash)
-
-		print(info.episode_number, info.infobox_date, info.episode_name, sep='|')
+			check_attr(info, 'prev_episode', '')
+			check_attr(info, 'prev_ep_date', '')
 
 		if info.double_episode:
+			print(ep, info.infobox_date, info.episode_name + ' (1)', info.url, sep='|')
 			ep += 1
+			print(ep, info.infobox_date, info.episode_name + ' (2)', info.url, sep='|')
+		else:
+			print(info.episode_number, info.infobox_date, info.episode_name, info.url, sep='|')
 
 		next_ep = ep + 1
 		prev = info
 
 	if prev:
-		check_attr(prev, 'next_episode', EnDash)
-		check_attr(prev, 'next_ep_date', EnDash)
+		check_attr(prev, 'next_episode', '')
+		check_attr(prev, 'next_ep_date', '')
 
 if __name__ == '__main__':
 	main()
