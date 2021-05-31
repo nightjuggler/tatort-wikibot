@@ -1,120 +1,26 @@
 import pywikibot
 import re
+import tatort_wiki_lib as TW
 
 Namespace = pywikibot.site.Namespace
+log = TW.log
 
-def log(info, format_spec, *args):
-	print('LOG', info.page_name, format_spec.format(*args), sep='|')
-
-def stringify(params):
-	return '|'.join(['='.join(p) for p in sorted(params.items())])
-
-Replace_With_Dash = re.compile('[^0-9a-z]+')
-Translation_Table = str.maketrans({
-	'ä': 'ae',
-	'ö': 'oe',
-	'ü': 'ue',
-	'ß': 'ss',
-	'â': 'a',
-	'à': 'a',
-	'é': 'e',
-	'ô': 'o',
-	'\u2019': None, # apostrophe (right single quotation mark)
-})
-
-def title2url(title):
-	url = title.lower().translate(Translation_Table)
-	url = Replace_With_Dash.sub('-', url)
-
-	if url[0] == '-':
-		url = url[1:]
-	if url[-1] == '-':
-		url = url[:-1]
-
-	return url
-
-EnDash = '\u2013'
-Months = {
-	'Januar':    1, 'Jan.':  1,
-	'Februar':   2, 'Feb.':  2,
-	'März':      3, 'Mär.':  3,
-	'April':     4, 'Apr.':  4,
-	'Mai':       5,
-	'Juni':      6, 'Jun.':  6,
-	'Juli':      7, 'Jul.':  7,
-	'August':    8, 'Aug.':  8,
-	'September': 9, 'Sep.':  9,
-	'Oktober':  10, 'Okt.': 10,
-	'November': 11, 'Nov.': 11,
-	'Dezember': 12, 'Dez.': 12,
-}
-Month_Days = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
-Date_Pattern = re.compile('^(?:\\{\\{0\\}\\})?([1-9][0-9]?)\\.(?: |&nbsp;)([A-Z][a-zä]+\\.?) +([12][0-9]{3})')
 Double_Episode_Date = ('27. September und 4. Oktober 2015', '2015-09-27')
-Special_Dates = {
+TW.Special_Dates = {
 	('Polizeiruf 110: Kreise', 'NF-DATUM'): Double_Episode_Date,
 	('Polizeiruf 110: Wendemanöver', 'Erstausstrahlung'): Double_Episode_Date,
 	('Polizeiruf 110: Grenzgänger', 'VG-DATUM'): Double_Episode_Date,
 }
-Alternate_Infobox_Dates = {
-}
-def parse_date_extra(info, param, extra):
-	return False
-
-def parse_date(date, info, param):
-	m = Date_Pattern.match(date)
-	if m is None:
-		special = Special_Dates.get((info.page_name, param))
-		if special:
-			if date == special[0]:
-				return special[1]
-		elif date in ('', EnDash) and param in ('VG-DATUM', 'NF-DATUM'):
-			return ''
-		log(info, 'Cannot parse date|{}={}|', param, date)
-		return ''
-	extra = date[m.end():]
-	if extra and not parse_date_extra(info, param, extra):
-		log(info, 'Extra text after date|{}={}|', param, date)
-
-	day, month, year = m.groups()
-	day, month, year = int(day), Months.get(month, 0), int(year)
-
-	if month == 0:
-		log(info, 'Invalid month|{}={}|', param, date)
-	elif day > Month_Days[month - 1]:
-		log(info, 'Invalid day|{}={}|', param, date)
-
-	return '{}-{:02}-{:02}'.format(year, month, day)
-
-Alternate_Titles = {
+TW.Series = 'Polizeiruf 110'
+TW.Series_Prefix = 'Polizeiruf 110: '
+TW.Alternate_Titles = {
 	'Polizeiruf 110: In Erinnerung an …': '"In Erinnerung an …"',
 }
-Episode_Number_Pattern = re.compile('^[1-9][0-9]*')
-PageName_Suffix_Pattern = re.compile('^ \\((?:[12][0-9]{3}|Film)\\)$')
-
-def get_episode_name(name):
-	if name.startswith('Polizeiruf 110: '):
-		name = name[16:]
-	if name.endswith(')'):
-		i = name.find('(')
-		if i > 1 and PageName_Suffix_Pattern.match(name[i-1:]):
-			name = name[:i-1]
-	return name
-
-def check_title(info, template, title):
-	title = title.replace('&nbsp;', ' ')
-	if title == info.episode_name:
-		return
-	if title == Alternate_Titles.get(info.page_name):
-		return
-	if title == 'Polizeiruf 110: ' + info.episode_name:
-		return
-	log(info, 'Mismatched {} title|{}|', template, title)
 
 class TatortInfo(object):
 	def __init__(self, page_name):
 		self.page_name = page_name
-		self.episode_name = get_episode_name(page_name)
+		self.episode_name = TW.get_episode_name(page_name)
 		self.prev_episode = None
 		self.next_episode = None
 		self.imdb = None
@@ -123,103 +29,8 @@ class TatortInfo(object):
 		self.infobox_date = None
 		self.double_episode = False
 
-def do_folgenleiste(info, params):
-	if info.prev_episode is not None:
-		log(info, 'Skipping duplicate Folgenleiste')
-		return
-
-	info.prev_episode = params.pop('VG', '')
-	info.next_episode = params.pop('NF', '')
-	info.prev_ep_page = params.pop('VG-ARTIKEL', None)
-	info.next_ep_page = params.pop('NF-ARTIKEL', None)
-	info.prev_ep_date = parse_date(params.pop('VG-DATUM', ''), info, 'VG-DATUM')
-	info.next_ep_date = parse_date(params.pop('NF-DATUM', ''), info, 'NF-DATUM')
-	if params:
-		log(info, 'Extraneous Folgenleiste parameters|{}|', stringify(params))
-
-def do_imdb(info, params):
-	if info.imdb is not None:
-		if info.imdb == params:
-			log(info, 'Skipping duplicate IMDb')
-		else:
-			log(info, 'Skipping different IMDb')
-		return
-
-	title = params.get('2')
-	if title is not None:
-		check_title(info, 'IMDb', title)
-
-	info.imdb = params
-
-def set_infobox_title(info, title):
-	if not info.infobox_title:
-		info.infobox_title = title
-		return True
-	if title:
-		log(info, 'Previous Infobox already specified episode title')
-	return False
-
-def get_infobox_title(info, params):
-	title = ''
-	title_param = None
-
-	for p in ('OT', 'Originaltitel', 'DT', 'Titel'):
-		v = params.get(p)
-		if not v:
-			continue
-		i = v.find('[')
-		if i >= 0:
-			v = v[:i].rstrip()
-		i = v.find('<')
-		if i >= 0:
-			v = v[:i].rstrip()
-		if not title:
-			title = v
-			title_param = p
-		elif title != v:
-			log(info, '{} and {} are different', p, title_param)
-
-	return set_infobox_title(info, title)
-
-def set_infobox_date(info, date):
-	if not info.infobox_date:
-		info.infobox_date = date
-		return True
-	if date:
-		log(info, 'Previous Infobox already specified episode date')
-	return False
-
-def get_infobox_date(info, params):
-	date = ''
-	date_param = None
-
-	for p in ('EAS', 'Erstausstrahlung', 'EASDE', 'Erstausstrahlung_DE'):
-		v = params.get(p)
-		if not v:
-			continue
-		v = parse_date(v, info, p)
-		if not v:
-			continue
-		alt = Alternate_Infobox_Dates.get(info.page_name)
-		if alt:
-			if v == alt[0]:
-				v = alt[1]
-			else:
-				log(info, 'Unexpected Infobox date|{}|{}|', v, alt[0])
-		if not date:
-			date = v
-			date_param = p
-			if p[-2:] == 'DE':
-				log(info, 'Use EAS/Erstausstrahlung instead of {}', p)
-		elif date == v:
-			log(info, 'Duplicate Infobox date|{}|{}', date_param, p)
-		else:
-			log(info, '{} and {} are different', p, date_param)
-
-	return set_infobox_date(info, date)
-
 def check_episode_number(info, ep):
-	m = Episode_Number_Pattern.match(ep)
+	m = TW.Episode_Number_Pattern.match(ep)
 	if not m:
 		return False
 
@@ -238,26 +49,10 @@ def check_episode_number(info, ep):
 
 	return False
 
-def set_episode_number(info, ep):
-	if info.episode_number is None:
-		info.episode_number = ep
-		return True
-	log(info, 'Previous Infobox already specified episode number')
-	return False
-
-def do_infobox_episode(info, params):
-	series = params.get('Serie', '')
-	if series == 'Polizeiruf 110':
-		set_episode_number(info, params.get('Episode', ''))
-	elif series:
-		log(info, 'Skipping Infobox for another series|{}|', series)
-		return
-
-	if 'Serienlogo' in params:
-		log(info, 'Should remove Infobox parameter Serienlogo')
-
-	get_infobox_title(info, params)
-	get_infobox_date(info, params)
+TW.Infobox_Series_Params.extend((
+	('Serie_Link',    False, 'Polizeiruf 110'),
+	('Episodenliste', True,  'Liste der Polizeiruf-110-Folgen'),
+))
 
 URL_Prefix = 'www.daserste.de/unterhaltung/krimi/polizeiruf-110/sendung/'
 URL_Suffix_Pattern = re.compile('^(?:[0-9]{4}/)?([0-9a-z]+(?:-[0-9a-z]+)*-?[0-9]{3})\\.html$')
@@ -297,11 +92,13 @@ def get_pages():
 		only_template_inclusion=True, namespaces=(Namespace.MAIN,))
 
 def main():
+	TW.Infobox_Stats.init()
+
 	templates = {
-		'Folgenleiste Polizeiruf-110-Folgen': do_folgenleiste,
-		'IMDb': do_imdb,
-		'Infobox Episode': do_infobox_episode,
-		'Medienbox': do_infobox_episode,
+		'Folgenleiste Polizeiruf-110-Folgen': TW.do_folgenleiste,
+		'IMDb': TW.do_imdb,
+		'Infobox Episode': TW.do_infobox_episode,
+		'Medienbox': TW.do_medienbox,
 	}
 	categories = {}
 	info_list = []
@@ -336,7 +133,7 @@ def main():
 			continue
 
 		if info.infobox_title:
-			check_title(info, 'Infobox', info.infobox_title)
+			TW.check_title(info, 'Infobox', info.infobox_title)
 		else:
 			log(info, 'Missing episode title')
 		if not info.infobox_date:
@@ -389,6 +186,8 @@ def main():
 	if prev:
 		check_attr(prev, 'next_episode', '')
 		check_attr(prev, 'next_ep_date', '')
+
+	TW.Infobox_Stats.write('polizeiruf110-infobox-stats.txt')
 
 if __name__ == '__main__':
 	main()
