@@ -1,8 +1,6 @@
-import pywikibot
 import re
 import tatort_wiki_lib as TW
 
-Namespace = pywikibot.site.Namespace
 log = TW.log
 
 Replace_With_Dash = re.compile('[^0-9a-z]+')
@@ -88,33 +86,25 @@ class TatortInfo(object):
 		self.prev_orf = False
 		self.next_orf = False
 
-def check_episode_number(info, ep):
-	m = TW.Episode_Number_Pattern.match(ep)
-	if not m:
+	def set_sortkey(self, suffix, ep):
+		if suffix == '':
+			self.sortkey = (ep, 0)
+			return True
+		if suffix == 'a':
+			self.sortkey = (ep, 1)
+			self.orf = True
+			return True
+		if suffix == 'b':
+			self.sortkey = (ep, 2)
+			self.orf = True
+			return True
+		if suffix == ', ' + str(ep + 1):
+			self.sortkey = (ep, 0)
+			self.episode_number = str(ep)
+			self.double_episode = True
+			return True
+
 		return False
-
-	i = m.end()
-	suffix = ep[i:]
-	ep = int(ep[:i])
-
-	if suffix == '':
-		info.sortkey = (ep, 0)
-		return True
-	if suffix == 'a':
-		info.sortkey = (ep, 1)
-		info.orf = True
-		return True
-	if suffix == 'b':
-		info.sortkey = (ep, 2)
-		info.orf = True
-		return True
-	if suffix == ', ' + str(ep + 1):
-		info.sortkey = (ep, 0)
-		info.episode_number = str(ep)
-		info.double_episode = True
-		return True
-
-	return False
 
 TW.Infobox_Series_Params.extend((
 	('Serie_Link',    True, 'Tatort (Fernsehreihe)'),
@@ -298,10 +288,17 @@ def ep2str(ep):
 	ep = str(n)
 	return ep + chr(96 + x) if x else ep
 
-def get_pages():
-	site = pywikibot.Site(code='de')
-	return pywikibot.Page(site, 'Folgenleiste Tatort-Folgen', ns=Namespace.TEMPLATE).getReferences(
-		only_template_inclusion=True, namespaces=(Namespace.MAIN,))
+def check_info(info, page):
+	if info.tatort_fans:
+		check_tatort_fans(info)
+	elif not info.orf:
+		log(info, 'Missing Tatort-Fans')
+	if info.tatort_folge:
+		check_tatort_folge(info)
+	elif not info.orf:
+		log(info, 'Missing Tatort-Folge')
+	if info.tatort_fundus:
+		check_tatort_fundus(info)
 
 def main():
 	TW.Infobox_Stats.init()
@@ -309,78 +306,12 @@ def main():
 	load_url_map('tatort-folge-url-map.txt', Tatort_Folge_URL_Map)
 	load_url_map('tatort-fundus-url-map.txt', Tatort_Fundus_URL_Map)
 
-	templates = {
-		'Folgenleiste Tatort-Folgen': TW.do_folgenleiste,
-		'IMDb': TW.do_imdb,
-		'Infobox Episode': TW.do_infobox_episode,
-		'Infobox Film': do_infobox_film,
-		'Medienbox': TW.do_medienbox,
-		'Tatort-Fans': do_tatort_fans,
-		'Tatort-Folge': do_tatort_folge,
-		'Tatort-Fundus': do_tatort_fundus,
-	}
-	categories = {}
-	info_list = []
-	main_ns = Namespace.MAIN
+	info_list = TW.process_pages(TatortInfo, check_info,
+		('Infobox Film', do_infobox_film),
+		('Tatort-Fans', do_tatort_fans),
+		('Tatort-Folge', do_tatort_folge),
+		('Tatort-Fundus', do_tatort_fundus))
 
-	for page in get_pages():
-		info = TatortInfo(page.title())
-
-		ns = page.namespace()
-		if ns.id != main_ns:
-			log(info, 'Not in the main namespace|{}|', ns.canonical_name)
-			continue
-
-		for cat in page.categories():
-			name = cat.title()
-			categories[name] = categories.get(name, 0) + 1
-
-		for template, params in page.raw_extracted_templates:
-			do_template = templates.get(template)
-			if do_template:
-				do_template(info, params)
-
-		ep = info.episode_number
-		if ep is None:
-			log(info, 'Missing Tatort Infobox')
-			continue
-		if not ep:
-			log(info, 'Missing episode number')
-			continue
-		if not check_episode_number(info, ep):
-			log(info, 'Invalid episode number|{}|', ep)
-			continue
-
-		if info.infobox_title:
-			TW.check_title(info, 'Infobox', info.infobox_title)
-		else:
-			log(info, 'Missing episode title')
-		if not info.infobox_date:
-			log(info, 'Missing episode date')
-			continue
-		if info.prev_episode is None:
-			log(info, 'Missing Folgenleiste')
-			continue
-
-		if info.imdb is None:
-			log(info, 'Missing IMDb')
-		if info.tatort_fans:
-			check_tatort_fans(info)
-		elif not info.orf:
-			log(info, 'Missing Tatort-Fans')
-		if info.tatort_folge:
-			check_tatort_folge(info)
-		elif not info.orf:
-			log(info, 'Missing Tatort-Folge')
-		if info.tatort_fundus:
-			check_tatort_fundus(info)
-
-		info_list.append(info)
-
-	for name, count in sorted(categories.items()):
-		print('CAT', '{:5}'.format(count), name, sep='|')
-
-	info_list.sort(key=lambda info: info.sortkey)
 	next_ep = (1, 0)
 	prev = None
 

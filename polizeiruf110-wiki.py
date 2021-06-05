@@ -1,8 +1,6 @@
-import pywikibot
 import re
 import tatort_wiki_lib as TW
 
-Namespace = pywikibot.site.Namespace
 log = TW.log
 
 Double_Episode_Date = ('27. September und 4. Oktober 2015', '2015-09-27')
@@ -29,25 +27,16 @@ class TatortInfo(object):
 		self.infobox_date = None
 		self.double_episode = False
 
-def check_episode_number(info, ep):
-	m = TW.Episode_Number_Pattern.match(ep)
-	if not m:
+	def set_sortkey(self, suffix, ep):
+		if suffix == '':
+			self.sortkey = ep
+			return True
+		if suffix == ', ' + str(ep + 1):
+			self.sortkey = ep
+			self.double_episode = True
+			return True
+
 		return False
-
-	i = m.end()
-	suffix = ep[i:]
-	ep = int(ep[:i])
-
-	if suffix == '':
-		info.sortkey = ep
-		return True
-	if suffix == ', ' + str(ep + 1):
-		info.sortkey = ep
-		info.episode_number = str(ep)
-		info.double_episode = True
-		return True
-
-	return False
 
 TW.Infobox_Series_Params.extend((
 	('Serie_Link',    False, 'Polizeiruf 110'),
@@ -86,74 +75,11 @@ def check_link(info, attr, name):
 	if link != name and link != name.replace(' ', '_'):
 		log(info, 'Mismatched {}_ep_page|{}|{}|', attr, link, name)
 
-def get_pages():
-	site = pywikibot.Site(code='de')
-	return pywikibot.Page(site, 'Folgenleiste Polizeiruf-110-Folgen', ns=Namespace.TEMPLATE).getReferences(
-		only_template_inclusion=True, namespaces=(Namespace.MAIN,))
-
 def main():
 	TW.Infobox_Stats.init()
 
-	templates = {
-		'Folgenleiste Polizeiruf-110-Folgen': TW.do_folgenleiste,
-		'IMDb': TW.do_imdb,
-		'Infobox Episode': TW.do_infobox_episode,
-		'Medienbox': TW.do_medienbox,
-	}
-	categories = {}
-	info_list = []
-	main_ns = Namespace.MAIN
+	info_list = TW.process_pages(TatortInfo, get_urls)
 
-	for page in get_pages():
-		info = TatortInfo(page.title())
-
-		ns = page.namespace()
-		if ns.id != main_ns:
-			log(info, 'Not in the main namespace|{}|', ns.canonical_name)
-			continue
-
-		for cat in page.categories():
-			name = cat.title()
-			categories[name] = categories.get(name, 0) + 1
-
-		for template, params in page.raw_extracted_templates:
-			do_template = templates.get(template)
-			if do_template:
-				do_template(info, params)
-
-		ep = info.episode_number
-		if ep is None:
-			log(info, 'Missing Polizeiruf 110 Infobox')
-			continue
-		if not ep:
-			log(info, 'Missing episode number')
-			continue
-		if not check_episode_number(info, ep):
-			log(info, 'Invalid episode number|{}|', ep)
-			continue
-
-		if info.infobox_title:
-			TW.check_title(info, 'Infobox', info.infobox_title)
-		else:
-			log(info, 'Missing episode title')
-		if not info.infobox_date:
-			log(info, 'Missing episode date')
-			continue
-		if info.prev_episode is None:
-			log(info, 'Missing Folgenleiste')
-			continue
-
-		if info.imdb is None:
-			log(info, 'Missing IMDb')
-
-		get_urls(info, page)
-
-		info_list.append(info)
-
-	for name, count in sorted(categories.items()):
-		print('CAT', '{:5}'.format(count), name, sep='|')
-
-	info_list.sort(key=lambda info: info.sortkey)
 	next_ep = 1
 	prev = None
 

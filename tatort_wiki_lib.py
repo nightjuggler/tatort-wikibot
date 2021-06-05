@@ -1,3 +1,4 @@
+import pywikibot
 import re
 import sys
 
@@ -388,3 +389,92 @@ def do_infobox_episode(info, params):
 
 def do_medienbox(info, params):
 	set_infobox_title(info, params.get('Titel'))
+
+def check_episode_number(info, ep):
+	m = Episode_Number_Pattern.match(ep)
+	if m:
+		i = m.end()
+		return info.set_sortkey(ep[i:], int(ep[:i]))
+	return False
+
+def process_pages(info_class, process_page, *other_actions):
+	categories = {}
+	templates = {}
+	info_list = []
+
+	navbar = 'Folgenleiste {}-Folgen'.format(Series.replace(' ', '-'))
+	template_actions = {
+		navbar: do_folgenleiste,
+		'IMDb': do_imdb,
+		'Infobox Episode': do_infobox_episode,
+		'Medienbox': do_medienbox,
+	}
+	template_actions.update(other_actions)
+
+	Namespace = pywikibot.site.Namespace
+	main_ns = Namespace.MAIN
+
+	site = pywikibot.Site(code='de')
+	pages = pywikibot.Page(site, navbar, ns=Namespace.TEMPLATE).getReferences(
+		only_template_inclusion=True, namespaces=(main_ns,))
+
+	for page in pages:
+		info = info_class(page.title())
+
+		ns = page.namespace()
+		if ns.id != main_ns:
+			log(info, 'Not in the main namespace|{}|', ns.canonical_name)
+			continue
+
+		for cat in page.categories():
+			name = cat.title()
+			categories[name] = categories.get(name, 0) + 1
+
+		for name, params in page.raw_extracted_templates:
+			if name.startswith(('SORTIERUNG:', 'DEFAULTSORT:')):
+				continue
+			action = template_actions.get(name)
+			if action:
+				action(info, params)
+			templates[name] = templates.get(name, 0) + 1
+
+		ep = info.episode_number
+		if ep is None:
+			log(info, 'Missing {} Infobox', Series)
+			continue
+		if not ep:
+			log(info, 'Missing episode number')
+			continue
+		if not check_episode_number(info, ep):
+			log(info, 'Invalid episode number|{}|', ep)
+			continue
+
+		if info.infobox_title:
+			check_title(info, 'Infobox', info.infobox_title)
+		else:
+			log(info, 'Missing episode title')
+		if not info.infobox_date:
+			log(info, 'Missing episode date')
+			continue
+		if info.prev_episode is None:
+			log(info, 'Missing Folgenleiste')
+			continue
+
+		if info.imdb is None:
+			log(info, 'Missing IMDb')
+
+		process_page(info, page)
+		info_list.append(info)
+
+	series = Series.replace(' ', '').lower()
+
+	with open(series + '-categories.txt', 'w') as f:
+		for name, count in sorted(categories.items()):
+			print('{:5}'.format(count), name, sep=' | ', file=f)
+
+	with open(series + '-templates.txt', 'w') as f:
+		for name, count in sorted(templates.items()):
+			print('{:5}'.format(count), name, sep=' | ', file=f)
+
+	info_list.sort(key=lambda info: info.sortkey)
+	return info_list
