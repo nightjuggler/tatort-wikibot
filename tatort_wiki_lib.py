@@ -400,6 +400,7 @@ def check_episode_number(info, ep):
 def process_pages(info_class, process_page, *other_actions):
 	categories = {}
 	templates = {}
+	Infobox_Stats.init()
 	info_list = []
 
 	navbar = 'Folgenleiste {}-Folgen'.format(Series.replace(' ', '-'))
@@ -475,6 +476,8 @@ def process_pages(info_class, process_page, *other_actions):
 	with open(series + '-templates.txt', 'w') as f:
 		for name, count in sorted(templates.items()):
 			print('{:5}'.format(count), name, sep=' | ', file=f)
+
+	Infobox_Stats.write(series + '-infobox-stats.txt')
 
 	info_list.sort(key=lambda info: info.sortkey)
 	return info_list

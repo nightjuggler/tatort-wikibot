@@ -76,8 +76,6 @@ def check_link(info, attr, name):
 		log(info, 'Mismatched {}_ep_page|{}|{}|', attr, link, name)
 
 def main():
-	TW.Infobox_Stats.init()
-
 	info_list = TW.process_pages(TatortInfo, get_urls)
 
 	next_ep = 1
@@ -112,8 +110,6 @@ def main():
 	if prev:
 		check_attr(prev, 'next_episode', '')
 		check_attr(prev, 'next_ep_date', '')
-
-	TW.Infobox_Stats.write('polizeiruf110-infobox-stats.txt')
 
 if __name__ == '__main__':
 	main()

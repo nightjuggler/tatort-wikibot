@@ -301,7 +301,6 @@ def check_info(info, page):
 		check_tatort_fundus(info)
 
 def main():
-	TW.Infobox_Stats.init()
 	load_url_map('tatort-fans-url-map.txt', Tatort_Fans_URL_Map)
 	load_url_map('tatort-folge-url-map.txt', Tatort_Folge_URL_Map)
 	load_url_map('tatort-fundus-url-map.txt', Tatort_Fundus_URL_Map)
@@ -347,8 +346,6 @@ def main():
 	if prev:
 		check_attr(prev, 'next_episode', TW.EnDash)
 		check_attr(prev, 'next_ep_date', '')
-
-	TW.Infobox_Stats.write('tatort-infobox-stats.txt')
 
 if __name__ == '__main__':
 	main()
