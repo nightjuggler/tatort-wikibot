@@ -12,8 +12,11 @@ class TatortSpec(object):
 	title_map = 'tatort-title-map.txt'
 	wiki_episodes = 'tatort-wiki-episodes.txt'
 	skip = set((
+		('2016-02-28', 'Kartenhaus', 'kartenhaus-122'),
 		('2016-11-13', 'Sonntagsmörder', 'sonntagsmoerder-106'),
+		('2019-02-24', 'Ein Tag wie jeder andere', 'ein-tag-wie-jeder-andere-138'),
 		('2019-03-31', 'Bombengeschäft', 'bombengeschaeft-116'),
+		('2019-05-19', 'Anne und der Tod', 'anne-und-der-tod-106'),
 		('2019-05-26', 'Die ewige Welle', 'die-ewige-welle-168'),
 		('2020-04-13', 'Das fleißige Lieschen', 'das-fleissige-lieschen-102'),
 	))
@@ -36,7 +39,9 @@ class PolizeirufSpec(object):
 		('2011-06-23', 'Im Alter von ...', 'im-alter-von-100'),
 		('2016-09-11', 'Wölfe', 'woelfe-116'),
 		('2018-06-10', 'In Flammen', 'in-flammen-104'),
+		('2019-04-07', 'Kindeswohl', 'kindeswohl-102'),
 		('2019-12-08', 'Die Lüge, die wir Zukunft nennen (FSK 16)', 'die-luege-die-wir-zukunft-nennen-154'),
+		('2021-05-30', 'Polizeiruf 110 - Die Krimidokumentation', 'die-krimidokumentation-100'),
 	))
 	change_date = {
 		('2012-04-18', 'Raubvögel'): '2012-03-18',
