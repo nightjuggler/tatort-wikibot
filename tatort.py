@@ -12,13 +12,7 @@ class TatortSpec(object):
 	title_map = 'tatort-title-map.txt'
 	wiki_episodes = 'tatort-wiki-episodes.txt'
 	skip = set((
-		('2016-02-28', 'Kartenhaus', 'kartenhaus-122'),
 		('2016-11-13', 'Sonntagsmörder', 'sonntagsmoerder-106'),
-		('2019-02-24', 'Ein Tag wie jeder andere', 'ein-tag-wie-jeder-andere-138'),
-		('2019-03-31', 'Bombengeschäft', 'bombengeschaeft-116'),
-		('2019-05-19', 'Anne und der Tod', 'anne-und-der-tod-106'),
-		('2019-05-26', 'Die ewige Welle', 'die-ewige-welle-168'),
-		('2020-04-13', 'Das fleißige Lieschen', 'das-fleissige-lieschen-102'),
 	))
 	change_date = {
 		('2014-12-12', 'Der Maulwurf'): '2014-12-21',
@@ -26,6 +20,7 @@ class TatortSpec(object):
 		('1979-06-14', 'Ein Schuss zuviel'): '1979-06-04',
 	}
 	add = (
+		('2019-06-10', 'Kaputt', 'kaputt-100'),
 	)
 
 class PolizeirufSpec(object):
@@ -37,10 +32,6 @@ class PolizeirufSpec(object):
 	skip = set((
 		('1985-01-27', 'Außenseiter', 'aussenseiter-100'),
 		('2011-06-23', 'Im Alter von ...', 'im-alter-von-100'),
-		('2016-09-11', 'Wölfe', 'woelfe-116'),
-		('2018-06-10', 'In Flammen', 'in-flammen-104'),
-		('2019-04-07', 'Kindeswohl', 'kindeswohl-102'),
-		('2019-12-08', 'Die Lüge, die wir Zukunft nennen (FSK 16)', 'die-luege-die-wir-zukunft-nennen-154'),
 		('2021-05-30', 'Polizeiruf 110 - Die Krimidokumentation', 'die-krimidokumentation-100'),
 	))
 	change_date = {
@@ -263,7 +254,7 @@ def read_html(spec):
 
 			url, title, date = m.groups()
 			date = '-'.join(reversed(date.split('.')))
-			title = title.removeprefix(spec.prefix)
+			title = title.removeprefix(spec.prefix).removesuffix(' (FSK 16)')
 			info = (date, title, url)
 
 			if info in spec.skip:
@@ -281,7 +272,26 @@ def read_html(spec):
 		log('Could not change date for "{}" ({})', title, date)
 
 	episodes.extend(spec.add)
-	episodes.sort()
+	if not episodes:
+		return episodes
+
+	sorted_episodes = sorted(episodes)
+	episodes = []
+
+	ep = 1
+	prev_date, prev_title, prev_url = sorted_episodes.pop(0)
+	for date, title, url in sorted_episodes:
+		if date == prev_date and title == prev_title:
+			if url in prev_url.split(','):
+				log('Skipping duplicate entry {}|{}|{}', date, title, url)
+				continue
+			prev_url += ',' + url
+		else:
+			episodes.append((ep, prev_date, prev_title, prev_url))
+			prev_date, prev_title, prev_url = date, title, url
+			ep += 1
+	episodes.append((ep, prev_date, prev_title, prev_url))
+
 	return episodes
 
 def read_wiki(spec):
@@ -317,28 +327,24 @@ def urlmap(spec):
 			ep, date, title, url = line.split('|')
 			wiki_titles[int(ep)] = title
 
-	for ep, (date, title, url) in enumerate(read_html(spec), start=1):
+	for ep, date, title, urls in read_html(spec):
 		wiki_title = wiki_titles.get(ep)
 		if wiki_title is None:
 			continue
 		wiki_url = title2url(wiki_title) + '-'
-		if not (len(url) > 3 and url[-3] in '12' and url[-2] in '0123456789' and url[-1] in '02468'):
-			log('Unexpected URL suffix: "{}"', url)
-			continue
-		url = url[:-3]
-		if url != wiki_url:
-			print(ep, url, sep='|')
+		last_url = None
+		for url in urls.split(','):
+			if not (len(url) > 3 and url[-3] in '12' and url[-2] in '0123456789' and url[-1] in '02468'):
+				log('Unexpected URL suffix: "{}"', url)
+				continue
+			url = url[:-3]
+			if url != wiki_url and url != last_url:
+				print(ep, url, sep='|')
+				last_url = url
 
 def html2txt(spec):
-	ep = 0
-	prev_date = None
-	prev_title = None
-	for date, title, url in read_html(spec):
-		if date != prev_date or title != prev_title:
-			ep += 1
-			prev_date = date
-			prev_title = title
-		print(ep, date, title, url, sep='|')
+	for info in read_html(spec):
+		print(*info, sep='|')
 
 def fetch(spec):
 	command = ['/usr/bin/curl', '-o', spec.html, spec.url]
@@ -351,9 +357,8 @@ def fetch(spec):
 
 def diff(spec):
 	wiki_episodes = read_wiki(spec)
-	html_episodes = read_html(spec)
 
-	for ep, info in enumerate(html_episodes, start=1):
+	for ep, *info in read_html(spec):
 		wiki_info = wiki_episodes.get(ep)
 		if not wiki_info:
 			print(ep, 'ADD', *info, sep='|')
@@ -369,8 +374,17 @@ def diff(spec):
 		if not url2:
 			print(ep, 'ADD-URL', url1, sep='|')
 			continue
-		urls = url2.split(',')
-		if url1 not in urls:
+		urls1 = url1.split(',')
+		urls2 = url2.split(',')
+		url1_prefixes = [url[:-3] for url in urls1]
+		mod_url = True
+		for url in urls2:
+			if url in urls1:
+				mod_url = False
+			elif len(url) > 3 and url[:-3] in url1_prefixes:
+				mod_url = True
+				break
+		if mod_url:
 			print(ep, 'MOD-URL', url2, url1, sep='|')
 
 def tatort_diff(): diff(TatortSpec)
