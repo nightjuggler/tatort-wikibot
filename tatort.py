@@ -20,7 +20,6 @@ class TatortSpec(object):
 		('1979-06-14', 'Ein Schuss zuviel'): '1979-06-04',
 	}
 	add = (
-		('2019-06-10', 'Kaputt', 'kaputt-100'),
 	)
 
 class PolizeirufSpec(object):
