@@ -14,7 +14,6 @@
 666|tatort-familiensache-
 774|tatort-die-heilige-
 806|tatort-wunschdenken-
-815|tatort-mauerpark-
 835|ihr-kinderlein-kommet
 837|tatort-die-ballade-von-cenk-und-valerie-
 842|tatort-borowski-und-der-stille-gast-
@@ -29,7 +28,6 @@
 875|spiel-auf-zeit-26052013-
 876|tatort-er-wird-toeten-
 889|tatort-wiesbaden-schwindelfrei-
-890|tatort-allmaechtig-
 892|tatort-borowski-und-der-engel-
 894|tatort-frankfurt-der-eskimo-
 898|tatort-auf-ewig-dein-
@@ -42,7 +40,6 @@
 911|tatort-ohnmacht-
 914|tatort-wien-paradies-
 929|tatort-der-irre-iwan-
-938|tatort-wien-grenzfall-
 950|tatort-wien-gier-
 952|tatort-stuttgart-der-inder-
 953|tatort-schutzlos-
