@@ -50,6 +50,7 @@ TW.Alternate_Titles = {
 	'Tatort: Aus der Traum (2006)': 'Aus der Traum …',
 	'Tatort: Die schlafende Schöne': 'Die Schlafende Schöne',
 	'Tatort: Laura mein Engel': 'Laura, mein Engel',
+	'Tatort: Liebe mich!': 'Liebe mich',
 	'Tatort: Murot und das Prinzip Hoffnung': 'Das Prinzip Hoffnung',
 	'Tatort: Romeo und Julia': 'Romeo & Julia',
 	'Tatort: Stirb und werde': 'Stirb und Werde',
