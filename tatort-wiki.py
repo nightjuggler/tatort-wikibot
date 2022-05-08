@@ -27,12 +27,8 @@ def title2url(title):
 
 	return url
 
-Double_Episode_Date = ('29. November und 6. Dezember 2020', '2020-11-29')
 TW.Special_Dates = {
 	('Tatort: Borowski und die Frau am Fenster', 'Erstausstrahlung'): ('2. Oktober [[2011]]', '2011-10-02'),
-	('Tatort: Die Ferien des Monsieur Murot', 'NF-DATUM'): Double_Episode_Date,
-	('Tatort: In der Familie', 'Erstausstrahlung'): Double_Episode_Date,
-	('Tatort: Es lebe der König!', 'VG-DATUM'): Double_Episode_Date,
 }
 TW.Alternate_Infobox_Dates = {
 	'Tatort: Exklusiv!': ('1969-10-26', '1971-07-11'),
@@ -110,8 +106,9 @@ class TatortInfo(object):
 		return False
 
 TW.Infobox_Series_Params.extend((
-	('Serie_Link',    True, 'Tatort (Fernsehreihe)'),
-	('Episodenliste', True, 'Liste der Tatort-Folgen'),
+	('Serie_Link',    True,  'Tatort (Fernsehreihe)'),
+	('Serienlogo',    False, 'Tatort Logo mini.svg'),
+	('Episodenliste', True,  'Liste der Tatort-Folgen'),
 ))
 
 def do_infobox_film(info, params):

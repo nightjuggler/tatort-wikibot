@@ -3,11 +3,7 @@ import tatort_wiki_lib as TW
 
 log = TW.log
 
-Double_Episode_Date = ('27. September und 4. Oktober 2015', '2015-09-27')
 TW.Special_Dates = {
-	('Polizeiruf 110: Kreise', 'NF-DATUM'): Double_Episode_Date,
-	('Polizeiruf 110: Wendemanöver', 'Erstausstrahlung'): Double_Episode_Date,
-	('Polizeiruf 110: Grenzgänger', 'VG-DATUM'): Double_Episode_Date,
 }
 TW.Series = 'Polizeiruf 110'
 TW.Series_Prefix = 'Polizeiruf 110: '
@@ -40,6 +36,7 @@ class TatortInfo(object):
 
 TW.Infobox_Series_Params.extend((
 	('Serie_Link',    False, 'Polizeiruf 110'),
+	('Serienlogo',    False, ''),
 	('Episodenliste', True,  'Liste der Polizeiruf-110-Folgen'),
 ))
 

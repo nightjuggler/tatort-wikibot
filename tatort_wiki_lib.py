@@ -23,17 +23,18 @@ Months = {
 	'November': 11, 'Nov.': 11,
 	'Dezember': 12, 'Dez.': 12,
 
-	'Jänner':    1, # Tatort: Die Faust (Parameter 'EAS' in Vorlage 'Infobox Episode')
+	'Jänner':    1, # Tatort: Die Faust (Parameter 'Premiere' in Vorlage 'Infobox Episode')
 }
 Month_Days = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
-Date_Pattern = re.compile('^(?:\\{\\{0\\}\\})?([1-9][0-9]?)\\.(?: |&nbsp;)([A-Z][a-zä]+\\.?) +([12][0-9]{3})')
+Date_Pattern = re.compile('([1-9][0-9]?)\\.(?: |&nbsp;)([A-Z][a-zä]+\\.?) +([12][0-9]{3})')
 Special_Dates = {}
 
 def parse_date_extra(info, param, extra):
 	return False
 
 def parse_date(date, info, param):
-	m = Date_Pattern.match(date)
+	date = date.replace('\n', '\\n')
+	m = Date_Pattern.search(date)
 	if m is None:
 		special = Special_Dates.get((info.page_name, param))
 		if special:
@@ -43,6 +44,8 @@ def parse_date(date, info, param):
 			return ''
 		log(info, 'Cannot parse date|{}={}|', param, date)
 		return ''
+	if m.start() > 0:
+		log(info, 'Extra text before date|{}={}|', param, date)
 	extra = date[m.end():]
 	if extra and not parse_date_extra(info, param, extra):
 		log(info, 'Extra text after date|{}={}|', param, date)
@@ -61,30 +64,31 @@ class Infobox_Stats(object):
 	Spec = (
 		'Serie                            |  ',
 		'Serie_Link                       |  ',
+		'Serienlogo                       |  ',
 		'Reihe                            |+ ',
 		'Titel                            |  ',
-		'Originaltitel           | OT     |+ ',
-		'Bild                    | BILD   |  ',
-		'Produktionsland         | PL     |+g',
-		'Produktionsunternehmen  | PROU   |  ',
-		'Originalsprache         | OS     |+g',
-		'Länge                   | LEN    |+g',
+		'Originaltitel                    |+ ',
+		'Bild                             |  ',
+		'Produktionsland                  |+g',
+		'Produktionsunternehmen           |  ',
+		'Originalsprache                  |+g',
+		'Länge                            |+g',
 		'Staffel                          |- ',
 		'Episode                          |+ ',
 		'Episode_gesamt                   |- ',
-		'Premiere   |Erstausstrahlung|EAS |+ ',
+		'Premiere   |Erstausstrahlung     |+ ',
 		'Premiere_DE|Erstausstrahlung_DE  |- ',
-		'Sender                  | SEN    |+g',
+		'Sender                           |+g',
 		'Sender_DE                        |- ',
-		'Altersfreigabe          | AF|FSK |  ',
+		'FSK                              |  ',
 		'JMK                              |- ',
-		'Regie                   | REG    |+ ',
-		'Drehbuch                | DRB    |+ ',
-		'Produzent               | PRO    |  ',
-		'Musik                   | MUSIK  |  ',
-		'Kamera                  | KAMERA |+ ',
-		'Schnitt                 | SCHNITT|+ ',
-		'Besetzung               | DS     |+ ',
+		'Regie                            |+ ',
+		'Drehbuch                         |+ ',
+		'Produzent                        |  ',
+		'Musik                            |  ',
+		'Kamera                           |+ ',
+		'Schnitt                          |+ ',
+		'Besetzung                        |+ ',
 		'Gastauftritt                     |+ ',
 		'Synchronisation                  |- ',
 		'Episodenliste                    |+ ',
@@ -182,7 +186,7 @@ def update_infobox_stats(info, params):
 				log(info, 'Infobox parameter {} should not be empty', name)
 		groups = group.groups
 		if groups is not None:
-			value = Ref_Pattern.sub('', value)
+			value = Ref_Pattern.sub('', value).replace('\n', '\\n')
 			groups[value] = groups.get(value, 0) + 1
 		if group.seen:
 			log(info, 'Should specify only one Infobox parameter {}', name)
@@ -217,7 +221,7 @@ def check_infobox_series(info, params):
 			log(info, 'Unexpected value for Infobox parameter {}|{}', p, v)
 
 def check_infobox_nonseries(info, params):
-	for p in ('Reihe', 'Serie_Link', 'Episodenliste'):
+	for p in ('Reihe', 'Serie_Link', 'Serienlogo', 'Episodenliste'):
 		if p in params:
 			log(info, 'Unexpected Infobox parameter {}', p)
 
@@ -287,7 +291,7 @@ def get_infobox_title(info, params):
 	title = ''
 	title_param = None
 
-	for p in ('OT', 'Originaltitel', 'Titel'):
+	for p in ('Originaltitel', 'Titel'):
 		v = params.get(p)
 		if not v:
 			continue
@@ -300,7 +304,7 @@ def get_infobox_title(info, params):
 			title = v
 			title_param = p
 			if p[0] != 'O':
-				log(info, 'Use OT/Originaltitel instead of {}', p)
+				log(info, 'Use Originaltitel instead of {}', p)
 		elif title == v:
 			log(info, 'Duplicate Infobox title|{}|{}', title_param, p)
 		else:
@@ -320,7 +324,7 @@ def get_infobox_date(info, params):
 	date = ''
 	date_param = None
 
-	for p in ('EAS', 'Erstausstrahlung', 'Premiere', 'Premiere_DE', 'Erstausstrahlung_DE'):
+	for p in ('Premiere', 'Erstausstrahlung', 'Premiere_DE', 'Erstausstrahlung_DE'):
 		v = params.get(p)
 		if not v:
 			continue
@@ -337,7 +341,7 @@ def get_infobox_date(info, params):
 			date = v
 			date_param = p
 			if p[-2:] == 'DE':
-				log(info, 'Use EAS/Erstausstrahlung/Premiere instead of {}', p)
+				log(info, 'Use Premiere/Erstausstrahlung instead of {}', p)
 		elif date == v:
 			log(info, 'Duplicate Infobox date|{}|{}', date_param, p)
 		else:
