@@ -35,6 +35,7 @@ class TatortInfo(object):
 		return False
 
 TW.Infobox_Series_Params.extend((
+	('Serie',         True,  'Polizeiruf 110'),
 	('Serie_Link',    False, 'Polizeiruf 110'),
 	('Serienlogo',    False, ''),
 	('Episodenliste', True,  'Liste der Polizeiruf-110-Folgen'),

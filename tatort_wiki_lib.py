@@ -62,36 +62,36 @@ def parse_date(date, info, param):
 
 class Infobox_Stats(object):
 	Spec = (
-		'Serie                            |  ',
-		'Serie_Link                       |  ',
-		'Serienlogo                       |  ',
+		'Serie                            |+ ',
+		'Serie_Link                       |+ ',
+		'Serienlogo                       |+ ',
 		'Reihe                            |+ ',
+		'Bild                             |  ',
 		'Titel                            |  ',
 		'Originaltitel                    |+ ',
-		'Bild                             |  ',
 		'Produktionsland                  |+g',
-		'Produktionsunternehmen           |  ',
+		'Produktionsunternehmen           |+ ',
 		'Originalsprache                  |+g',
 		'Länge                            |+g',
 		'Staffel                          |- ',
 		'Episode                          |+ ',
 		'Episode_gesamt                   |- ',
-		'Premiere   |Erstausstrahlung     |+ ',
-		'Premiere_DE|Erstausstrahlung_DE  |- ',
+		'Episodenliste                    |+ ',
+		'Premiere|Erstausstrahlung        |+ ',
+		'Premiere_DE                      |- ',
 		'Sender                           |+g',
 		'Sender_DE                        |- ',
 		'FSK                              |  ',
-		'JMK                              |- ',
+		'JMK                              |  ',
 		'Regie                            |+ ',
 		'Drehbuch                         |+ ',
-		'Produzent                        |  ',
-		'Musik                            |  ',
+		'Produzent                        |+ ',
+		'Musik                            |+ ',
 		'Kamera                           |+ ',
 		'Schnitt                          |+ ',
 		'Besetzung                        |+ ',
-		'Gastauftritt                     |+ ',
 		'Synchronisation                  |- ',
-		'Episodenliste                    |+ ',
+		'Chronologie                      |+ ',
 	)
 
 	class Param(object):
@@ -194,25 +194,25 @@ def update_infobox_stats(info, params):
 			group.seen = True
 
 def check_infobox_common(info, params):
-	for p1, p2 in (
-		('DRB',     'Drehbuch'),
-		('DS',      'Besetzung'),
-		('KAMERA',  'Kamera'),
-		('LEN',     'Länge'),
-		('OS',      'Originalsprache'),
-		('PL',      'Produktionsland'),
-		('REG',     'Regie'),
-		('SCHNITT', 'Schnitt'),
-		('SEN',     'Sender'),
+	for p in (
+		'Besetzung',
+		'Drehbuch',
+		'Kamera',
+		'Länge',
+		'Originalsprache',
+		'Produktionsland',
+		'Regie',
+		'Schnitt',
+		'Sender',
 	):
-		if not (p1 in params or p2 in params):
-			log(info, 'Missing Infobox parameter {}', p2)
+		if p not in params:
+			log(info, 'Missing Infobox parameter {}', p)
 
 Infobox_Series_Params = [
 	('Reihe', True, 'ja'),
 ]
-def check_infobox_series(info, params):
-	for p, required, x in Infobox_Series_Params:
+def check_infobox_normal(info, params, series_params=Infobox_Series_Params):
+	for p, required, x in series_params:
 		v = params.get(p)
 		if v is None:
 			if required:
@@ -220,8 +220,16 @@ def check_infobox_series(info, params):
 		elif v != x if v else required:
 			log(info, 'Unexpected value for Infobox parameter {}|{}', p, v)
 
-def check_infobox_nonseries(info, params):
-	for p in ('Reihe', 'Serie_Link', 'Serienlogo', 'Episodenliste'):
+def check_infobox_special(info, params):
+	series_params = (
+		('Reihe',      True, 'ja'),
+		('Serie',      True, 'Tatort'),
+		('Serie_Link', True, 'Tatort (Fernsehreihe)'),
+		('Episode',    True, "142 der Reihe ''[[Polizeiruf 110]]''<br /> und 235"),
+	)
+	check_infobox_normal(info, params, series_params)
+
+	for p in ('Serienlogo', 'Episodenliste'):
 		if p in params:
 			log(info, 'Unexpected Infobox parameter {}', p)
 
@@ -324,7 +332,7 @@ def get_infobox_date(info, params):
 	date = ''
 	date_param = None
 
-	for p in ('Premiere', 'Erstausstrahlung', 'Premiere_DE', 'Erstausstrahlung_DE'):
+	for p in ('Premiere', 'Erstausstrahlung', 'Premiere_DE'):
 		v = params.get(p)
 		if not v:
 			continue
@@ -356,32 +364,18 @@ def set_episode_number(info, ep):
 	log(info, 'Episode number already specified')
 	return False
 
-def set_nonseries_episode(info, episode):
-	pattern = re.compile('^([1-9][0-9]*) \\(\\[\\[(.*)\\]\\]\\)$')
-	for ep in episode.split('<br />'):
-		m = pattern.match(ep)
-		if not m:
-			log(info, 'Unexpected episode number|{}|', ep)
-		elif m.group(2).split('|')[-1] == Series:
-			set_episode_number(info, m.group(1))
-
 def do_infobox_episode(info, params):
-	episode = params.get('Episode', '')
-	series = params.get('Serie')
+	get_infobox_date(info, params)
+	get_infobox_title(info, params)
 
-	if series == Series:
-		set_episode_number(info, episode)
-		check_infobox_series(info, params)
-	elif series:
-		log(info, 'Skipping Infobox for another series|{}|', series)
-		return
+	if info.infobox_title == 'Unter Brüdern':
+		check_infobox_special(info, params)
+		set_episode_number(info, '235' if Series == 'Tatort' else '142')
 	else:
-		set_nonseries_episode(info, episode)
-		check_infobox_nonseries(info, params)
+		check_infobox_normal(info, params)
+		set_episode_number(info, params.get('Episode', ''))
 
 	check_infobox_common(info, params)
-	get_infobox_title(info, params)
-	get_infobox_date(info, params)
 	update_infobox_stats(info, params)
 
 def check_episode_number(info, ep):

@@ -28,12 +28,12 @@ def title2url(title):
 	return url
 
 TW.Special_Dates = {
-	('Tatort: Borowski und die Frau am Fenster', 'Erstausstrahlung'): ('2. Oktober [[2011]]', '2011-10-02'),
+	('Zabou (Film)', 'Premiere'): ('1990-07-22', '1990-07-22'),
 }
 TW.Alternate_Infobox_Dates = {
 	'Tatort: Exklusiv!': ('1969-10-26', '1971-07-11'),
-	'Zahn um Zahn (1985)': ('1985-10-10', '1987-12-27'),
-	'Zabou (Film)': ('1987-03-05', '1990-07-22'),
+#	'Zahn um Zahn (1985)': ('1985-10-10', '1987-12-27'),
+#	'Zabou (Film)': ('1987-03-05', '1990-07-22'),
 	'Tatort: Mord hinterm Deich': ('1996-12-25', '1997-06-08'),
 	'Tatort: Passion': ('1999-11-17', '2000-07-30'),
 	'Tatort: Time-Out': ('2001-09-23', '2002-12-22'),
@@ -106,6 +106,7 @@ class TatortInfo(object):
 		return False
 
 TW.Infobox_Series_Params.extend((
+	('Serie',         True,  'Tatort'),
 	('Serie_Link',    True,  'Tatort (Fernsehreihe)'),
 	('Serienlogo',    False, 'Tatort Logo mini.svg'),
 	('Episodenliste', True,  'Liste der Tatort-Folgen'),
