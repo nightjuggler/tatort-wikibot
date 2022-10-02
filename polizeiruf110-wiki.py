@@ -3,10 +3,11 @@ import tatort_wiki_lib as TW
 
 log = TW.log
 
-TW.Special_Dates = {
-}
 TW.Series = 'Polizeiruf 110'
 TW.Series_Prefix = 'Polizeiruf 110: '
+TW.Alternate_Infobox_Dates = {
+	'Polizeiruf 110: Wendemanöver': ('2015-09-27', '2015-10-04'),
+}
 TW.Alternate_Titles = {
 	'Polizeiruf 110: In Erinnerung an …': '"In Erinnerung an …"',
 }
@@ -27,7 +28,7 @@ class TatortInfo(object):
 		if suffix == '':
 			self.sortkey = ep
 			return True
-		if suffix == ', ' + str(ep + 1):
+		if suffix == ' & ' + str(ep + 1):
 			self.sortkey = ep
 			self.double_episode = True
 			return True

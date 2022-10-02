@@ -39,6 +39,7 @@ TW.Alternate_Infobox_Dates = {
 	'Tatort: Time-Out': ('2001-09-23', '2002-12-22'),
 	'Tatort: Seenot': ('2008-01-13', '2008-03-24'),
 	'Tatort: Der Polizistinnenmörder': ('2010-01-03', '2010-01-17'),
+	'Tatort: In der Familie': ('2020-11-29', '2020-12-06'),
 	'Tatort: Die Amme': ('2021-03-14', '2021-03-28'),
 }
 TW.Alternate_Titles = {
@@ -97,7 +98,7 @@ class TatortInfo(object):
 			self.sortkey = (ep, 2)
 			self.orf = True
 			return True
-		if suffix == ', ' + str(ep + 1):
+		if suffix == ' & ' + str(ep + 1):
 			self.sortkey = (ep, 0)
 			self.episode_number = str(ep)
 			self.double_episode = True
