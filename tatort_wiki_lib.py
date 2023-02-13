@@ -63,7 +63,6 @@ def parse_date(date, info, param):
 class Infobox_Stats(object):
 	Spec = (
 		'Serie                            |+ ',
-		'Serie_Link                       |+ ',
 		'Serienlogo                       |+ ',
 		'Reihe                            |+ ',
 		'Bild                             |  ',
@@ -77,7 +76,7 @@ class Infobox_Stats(object):
 		'Episode                          |+ ',
 		'Episode_gesamt                   |- ',
 		'Episodenliste                    |+ ',
-		'Premiere|Erstausstrahlung        |+ ',
+		'Premiere                         |+ ',
 		'Premiere_DE                      |- ',
 		'Sender                           |+g',
 		'Sender_DE                        |- ',
@@ -223,8 +222,7 @@ def check_infobox_normal(info, params, series_params=Infobox_Series_Params):
 def check_infobox_special(info, params):
 	series_params = (
 		('Reihe',      True, 'ja'),
-		('Serie',      True, 'Tatort'),
-		('Serie_Link', True, 'Tatort (Fernsehreihe)'),
+		('Serie',      True, 'Tatort (Fernsehreihe)'),
 		('Episode',    True, "142 der Reihe ''[[Polizeiruf 110]]''<br /> und 235"),
 	)
 	check_infobox_normal(info, params, series_params)
@@ -332,7 +330,7 @@ def get_infobox_date(info, params):
 	date = ''
 	date_param = None
 
-	for p in ('Premiere', 'Erstausstrahlung', 'Premiere_DE'):
+	for p in ('Premiere', 'Premiere_DE'):
 		v = params.get(p)
 		if not v:
 			continue
@@ -349,7 +347,7 @@ def get_infobox_date(info, params):
 			date = v
 			date_param = p
 			if p[-2:] == 'DE':
-				log(info, 'Use Premiere/Erstausstrahlung instead of {}', p)
+				log(info, 'Use Premiere instead of {}', p)
 		elif date == v:
 			log(info, 'Duplicate Infobox date|{}|{}', date_param, p)
 		else:
