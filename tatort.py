@@ -38,8 +38,6 @@ class PolizeirufSpec(object):
 	}
 	add = (
 		('1979-12-02', 'Die letzte Fahrt', ''),
-		('1981-11-29', 'Glassplitter', 'glassplitter-100'),
-		('1989-02-19', 'Variante Tramper', 'variante-tramper-100'),
 	)
 
 def log(message, *args, **kwargs):
@@ -290,7 +288,6 @@ def read_html(spec):
 			prev_date, prev_title, prev_url = date, title, url
 			ep += 1
 	episodes.append((ep, prev_date, prev_title, prev_url))
-
 	return episodes
 
 def read_wiki(spec):
@@ -314,9 +311,8 @@ def read_wiki(spec):
 			if unexpected_chars:
 				log('Unexpected characters [{}] in "{}"',
 					', '.join(['U+{:04X}'.format(ord(ch)) for ch in unexpected_chars]), title)
-			title = title_map.get(title, title)
+			title = title_map.get(title, title.replace('\u2019', '\''))
 			episodes[int(ep)] = (date, title, url[:-1])
-
 	return episodes
 
 def urlmap(spec):
