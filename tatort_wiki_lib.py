@@ -244,11 +244,20 @@ def get_episode_name(name):
 	if name.endswith(')'):
 		i = name.find('(')
 		if i > 1 and PageName_Suffix_Pattern.match(name[i-1:]):
-			name = name[:i-1]
-	return name
+			return name[:i-1], name[i+1:-1]
+	return name, None
 
-def check_title(info, template, title):
+def check_title(info, template, title, part=None):
 	title = title.replace('&nbsp;', ' ')
+	if info.double_episode and part:
+		for suffix in (' ({})', ' (Teil {})', ' Teil {}'):
+			suffix = suffix.format(part)
+			if title.endswith(suffix):
+				title = title.removesuffix(suffix)
+				break
+		else:
+			log(info, 'Mismatched {} title|{}|', template, title)
+			return
 	if title == info.episode_name:
 		return
 	if title == Alternate_Titles.get(info.page_name):

@@ -15,7 +15,7 @@ TW.Alternate_Titles = {
 class TatortInfo(object):
 	def __init__(self, page_name):
 		self.page_name = page_name
-		self.episode_name = TW.get_episode_name(page_name)
+		self.episode_name, self.page_suffix = TW.get_episode_name(page_name)
 		self.prev_episode = None
 		self.next_episode = None
 		self.imdb = None
