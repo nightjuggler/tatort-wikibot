@@ -37,9 +37,7 @@ TW.Alternate_Infobox_Dates = {
 	'Tatort: Time-Out': ('2001-09-23', '2002-12-22'),
 	'Tatort: Seenot': ('2008-01-13', '2008-03-24'),
 	'Tatort: Der Polizistinnenmörder': ('2010-01-03', '2010-01-17'),
-	'Tatort: In der Familie': ('2020-11-29', '2020-12-06'),
 	'Tatort: Die Amme': ('2021-03-14', '2021-03-28'),
-	'Tatort: Nichts als die Wahrheit': ('2023-04-09', '2023-04-10'),
 }
 TW.Alternate_Titles = {
 	'Tatort: Acht, neun – aus': 'Acht, neun – aus!',
@@ -55,7 +53,7 @@ TW.Alternate_Titles = {
 	'Tatort: … es wird Trauer sein und Schmerz': '... es wird Trauer sein und Schmerz',
 }
 
-def parse_date_extra(info, param, extra):
+def parse_date_after(info, param, extra):
 	if extra == ' (nur ORF)':
 		if param == 'VG-DATUM':
 			info.prev_orf = True
@@ -63,9 +61,11 @@ def parse_date_extra(info, param, extra):
 		if param == 'NF-DATUM':
 			info.next_orf = True
 			return True
+	elif param == 'Sender':
+		return extra == ' ebd. (Teil 2)'
 	return False
 
-TW.parse_date_extra = parse_date_extra
+TW.parse_date_after = parse_date_after
 
 class TatortInfo(object):
 	def __init__(self, page_name):
@@ -84,26 +84,21 @@ class TatortInfo(object):
 		self.prev_orf = False
 		self.next_orf = False
 
-	def set_sortkey(self, suffix, ep):
+	def get_sortkey(self, suffix, ep):
 		if suffix == '':
-			self.sortkey = (ep, 0)
-			return True
+			return ep, 0
 		if suffix == 'a':
-			self.sortkey = (ep, 1)
 			self.orf = True
-			return True
+			return ep, 1
 		if suffix == 'b':
-			self.sortkey = (ep, 2)
 			self.orf = True
-			return True
+			return ep, 2
 		suffix = suffix.split()
 		if len(suffix) == 2 and suffix[1] == str(ep + 1) and suffix[0] in ('&', 'und'):
-			self.sortkey = (ep, 0)
 			self.episode_number = str(ep)
 			self.double_episode = True
-			return True
-
-		return False
+			return ep, 0
+		return None
 
 TW.Infobox_Series_Params.extend((
 	('Serie',         True,  'Tatort (Fernsehreihe)'),
@@ -242,15 +237,6 @@ def check_tatort_folge(info):
 
 	info.tatort_folge = prev_url
 
-def check_attr(info, attr, value):
-	if getattr(info, attr) != value:
-		log(info, 'Mismatched {}|{}|{}|', attr, getattr(info, attr), value)
-
-def check_link(info, attr, name):
-	link = getattr(info, attr + '_ep_page') or 'Tatort: ' + getattr(info, attr + '_episode')
-	if link != name and link != name.replace(' ', '_'):
-		log(info, 'Mismatched {}_ep_page|{}|{}|', attr, link, name)
-
 def ep2str(ep):
 	n, x = ep
 	ep = str(n)
@@ -285,18 +271,13 @@ def main():
 		elif prev:
 			if prev.orf != info.prev_orf:
 				log(info, '{}xpected " (nur ORF)" after prev_ep_date', 'E' if prev.orf else 'Une')
-			check_attr(info, 'prev_episode', prev.episode_name)
-			check_attr(info, 'prev_ep_date', prev.infobox_date)
-			check_link(info, 'prev', prev.page_name)
-
 			if info.orf != prev.next_orf:
 				log(prev, '{}xpected " (nur ORF)" after next_ep_date', 'E' if info.orf else 'Une')
-			check_attr(prev, 'next_episode', info.episode_name)
-			check_attr(prev, 'next_ep_date', info.infobox_date)
-			check_link(prev, 'next', info.page_name)
+			TW.check_attrs(info, 'prev', prev)
+			TW.check_attrs(prev, 'next', info)
 		else:
-			check_attr(info, 'prev_episode', TW.EnDash)
-			check_attr(info, 'prev_ep_date', '')
+			TW.check_attr(info, 'prev_episode', TW.EnDash)
+			TW.check_attr(info, 'prev_ep_date', '')
 
 		if info.double_episode:
 			name = info.episode_name
@@ -305,7 +286,7 @@ def main():
 				print(ep[0], info.infobox_date, name + ' (1)', urls[0], sep='|')
 			ep = (ep[0] + 1, 0)
 			if urls and urls[1]:
-				print(ep[0], info.infobox_date, name + ' (2)', urls[1], sep='|')
+				print(ep[0], info.part2_date, name + ' (2)', urls[1], sep='|')
 		elif info.tatort_folge:
 			print(info.episode_number, info.infobox_date, info.episode_name, info.tatort_folge, sep='|')
 
@@ -313,8 +294,8 @@ def main():
 		prev = info
 
 	if prev:
-		check_attr(prev, 'next_episode', TW.EnDash)
-		check_attr(prev, 'next_ep_date', '')
+		TW.check_attr(prev, 'next_episode', TW.EnDash)
+		TW.check_attr(prev, 'next_ep_date', '')
 
 if __name__ == '__main__':
 	main()

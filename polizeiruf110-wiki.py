@@ -5,9 +5,6 @@ log = TW.log
 
 TW.Series = 'Polizeiruf 110'
 TW.Series_Prefix = 'Polizeiruf 110: '
-TW.Alternate_Infobox_Dates = {
-	'Polizeiruf 110: Wendemanöver': ('2015-09-27', '2015-10-04'),
-}
 TW.Alternate_Titles = {
 	'Polizeiruf 110: In Erinnerung an …': '"In Erinnerung an …"',
 }
@@ -24,16 +21,13 @@ class TatortInfo(object):
 		self.infobox_date = None
 		self.double_episode = False
 
-	def set_sortkey(self, suffix, ep):
+	def get_sortkey(self, suffix, ep):
 		if suffix == '':
-			self.sortkey = ep
-			return True
+			return ep
 		if suffix == ' & ' + str(ep + 1):
-			self.sortkey = ep
 			self.double_episode = True
-			return True
-
-		return False
+			return ep
+		return None
 
 TW.Infobox_Series_Params.extend((
 	('Serie',         True,  'Polizeiruf 110'),
@@ -64,15 +58,6 @@ def get_urls(info, page):
 		urls.append(m.group(1))
 	info.url = ','.join(urls)
 
-def check_attr(info, attr, value):
-	if getattr(info, attr) != value:
-		log(info, 'Mismatched {}|{}|{}|', attr, getattr(info, attr), value)
-
-def check_link(info, attr, name):
-	link = getattr(info, attr + '_ep_page') or 'Polizeiruf 110: ' + getattr(info, attr + '_episode')
-	if link != name and link != name.replace(' ', '_'):
-		log(info, 'Mismatched {}_ep_page|{}|{}|', attr, link, name)
-
 def main():
 	info_list = TW.process_pages(TatortInfo, get_urls)
 
@@ -84,30 +69,24 @@ def main():
 		if ep != next_ep:
 			log(info, 'Unexpected episode number|{}|{}', ep, next_ep)
 		elif prev:
-			check_attr(info, 'prev_episode', prev.episode_name)
-			check_attr(info, 'prev_ep_date', prev.infobox_date)
-			check_link(info, 'prev', prev.page_name)
-
-			check_attr(prev, 'next_episode', info.episode_name)
-			check_attr(prev, 'next_ep_date', info.infobox_date)
-			check_link(prev, 'next', info.page_name)
+			TW.check_attrs(info, 'prev', prev)
+			TW.check_attrs(prev, 'next', info)
 		else:
-			check_attr(info, 'prev_episode', '')
-			check_attr(info, 'prev_ep_date', '')
+			TW.check_attr(info, 'prev_episode', '')
+			TW.check_attr(info, 'prev_ep_date', '')
 
 		if info.double_episode:
 			print(ep, info.infobox_date, info.episode_name + ' (1)', info.url, sep='|')
-			ep += 1
-			print(ep, info.infobox_date, info.episode_name + ' (2)', info.url, sep='|')
+			print(ep+1, info.part2_date, info.episode_name + ' (2)', info.url, sep='|')
+			next_ep = ep + 2
 		else:
 			print(info.episode_number, info.infobox_date, info.episode_name, info.url, sep='|')
-
-		next_ep = ep + 1
+			next_ep = ep + 1
 		prev = info
 
 	if prev:
-		check_attr(prev, 'next_episode', '')
-		check_attr(prev, 'next_ep_date', '')
+		TW.check_attr(prev, 'next_episode', '')
+		TW.check_attr(prev, 'next_ep_date', '')
 
 if __name__ == '__main__':
 	main()

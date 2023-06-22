@@ -26,13 +26,45 @@ Months = {
 	'Jänner':    1, # Tatort: Die Faust (Parameter 'Premiere' in Vorlage 'Infobox Episode')
 }
 Month_Days = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
-Date_Pattern = re.compile('([1-9][0-9]?)\\.(?: |&nbsp;)([A-Z][a-zä]+\\.?) +([12][0-9]{3})')
+Day_Pattern = '([1-9][0-9]?)\\.'
+Month_Pattern = '(?: |&nbsp;)([A-Z][a-zä]{2,8}\\.?)'
+Year_Pattern = '([12][0-9]{3})'
+Date_Pattern = re.compile(f'{Day_Pattern}{Month_Pattern} +{Year_Pattern}')
+Before_Date_Pattern = re.compile(f'^{Day_Pattern}(?:{Month_Pattern})? +und +$')
 Special_Dates = {}
 
-def parse_date_extra(info, param, extra):
+def parse_date_before(info, param, extra, date, month, year):
+	if param == 'VG-DATUM':
+		attr = 'prev_ep_date2'
+	elif param == 'NF-DATUM':
+		attr = 'next_ep_date2'
+	elif param == 'Sender':
+		return extra.startswith('[[') and extra.endswith(']] (Teil 1)<br />')
+	else:
+		return False
+
+	m = Before_Date_Pattern.match(extra)
+	if not m:
+		return False
+
+	day, month2 = m.groups()
+	day = int(day)
+	if month2:
+		month = Months.get(month2, 0)
+
+	if month == 0 or day > Month_Days[month - 1]:
+		log(info, 'Invalid date before date|{}={}|', param, date)
+		return True
+
+	setattr(info, attr, f'{year}-{month:02}-{day:02}')
+	return True
+
+def parse_date_after(info, param, extra):
+	if param == 'Sender':
+		return extra == ' ebd. (Teil 2)'
 	return False
 
-def parse_date(date, info, param):
+def parse_date(info, param, date):
 	date = date.replace('\n', '\\n')
 	m = Date_Pattern.search(date)
 	if m is None:
@@ -44,21 +76,22 @@ def parse_date(date, info, param):
 			return ''
 		log(info, 'Cannot parse date|{}={}|', param, date)
 		return ''
-	if m.start() > 0:
-		log(info, 'Extra text before date|{}={}|', param, date)
-	extra = date[m.end():]
-	if extra and not parse_date_extra(info, param, extra):
-		log(info, 'Extra text after date|{}={}|', param, date)
 
 	day, month, year = m.groups()
 	day, month, year = int(day), Months.get(month, 0), int(year)
 
-	if month == 0:
-		log(info, 'Invalid month|{}={}|', param, date)
-	elif day > Month_Days[month - 1]:
-		log(info, 'Invalid day|{}={}|', param, date)
+	if month == 0 or day > Month_Days[month - 1]:
+		log(info, 'Invalid date|{}={}|', param, date)
+		return ''
 
-	return '{}-{:02}-{:02}'.format(year, month, day)
+	extra = date[:m.start()]
+	if extra and not parse_date_before(info, param, extra, date, month, year):
+		log(info, 'Extra text before date|{}={}|', param, date)
+	extra = date[m.end():]
+	if extra and not parse_date_after(info, param, extra):
+		log(info, 'Extra text after date|{}={}|', param, date)
+
+	return f'{year}-{month:02}-{day:02}'
 
 class Infobox_Stats(object):
 	Spec = (
@@ -275,8 +308,8 @@ def do_folgenleiste(info, params):
 	info.next_episode = params.pop('NF', '')
 	info.prev_ep_page = params.pop('VG-ARTIKEL', None)
 	info.next_ep_page = params.pop('NF-ARTIKEL', None)
-	info.prev_ep_date = parse_date(params.pop('VG-DATUM', ''), info, 'VG-DATUM')
-	info.next_ep_date = parse_date(params.pop('NF-DATUM', ''), info, 'NF-DATUM')
+	info.prev_ep_date = parse_date(info, 'VG-DATUM', params.pop('VG-DATUM', ''))
+	info.next_ep_date = parse_date(info, 'NF-DATUM', params.pop('NF-DATUM', ''))
 	if params:
 		log(info, 'Extraneous Folgenleiste parameters|{}|', stringify(params))
 
@@ -343,7 +376,7 @@ def get_infobox_date(info, params):
 		v = params.get(p)
 		if not v:
 			continue
-		v = parse_date(v, info, p)
+		v = parse_date(info, p, v)
 		if not v:
 			continue
 		alt = Alternate_Infobox_Dates.get(info.page_name)
@@ -365,11 +398,15 @@ def get_infobox_date(info, params):
 	return set_infobox_date(info, date)
 
 def set_episode_number(info, ep):
-	if info.episode_number is None:
-		info.episode_number = ep
-		return True
-	log(info, 'Episode number already specified')
-	return False
+	if info.episode_number is not None:
+		log(info, 'Episode number already specified')
+		return
+	info.episode_number = ep
+	if m := Episode_Number_Pattern.match(ep):
+		i = m.end()
+		info.sortkey = info.get_sortkey(ep[i:], int(ep[:i]))
+	else:
+		info.sortkey = None
 
 def do_infobox_episode(info, params):
 	get_infobox_date(info, params)
@@ -382,15 +419,28 @@ def do_infobox_episode(info, params):
 		check_infobox_normal(info, params)
 		set_episode_number(info, params.get('Episode', ''))
 
+	if info.double_episode:
+		info.part2_date = parse_date(info, 'Sender', params.get('Sender', ''))
+
 	check_infobox_common(info, params)
 	update_infobox_stats(info, params)
 
-def check_episode_number(info, ep):
-	m = Episode_Number_Pattern.match(ep)
-	if m:
-		i = m.end()
-		return info.set_sortkey(ep[i:], int(ep[:i]))
-	return False
+def check_attr(info, attr, value):
+	if getattr(info, attr, '') != value:
+		log(info, 'Mismatched {}|{}|{}|', attr, getattr(info, attr, ''), value)
+
+def check_attrs(info, attr, prev):
+	check_attr(info, attr + '_episode', prev.episode_name)
+	if prev.double_episode:
+		check_attr(info, attr + '_ep_date', prev.part2_date)
+		check_attr(info, attr + '_ep_date2', prev.infobox_date)
+	else:
+		check_attr(info, attr + '_ep_date', prev.infobox_date)
+		check_attr(info, attr + '_ep_date2', '')
+	name = prev.page_name
+	link = getattr(info, attr + '_ep_page') or Series_Prefix + getattr(info, attr + '_episode')
+	if link != name and link != name.replace(' ', '_'):
+		log(info, 'Mismatched {}_ep_page|{}|{}|', attr, link, name)
 
 def process_pages(info_class, process_page, *other_actions):
 	categories = {}
@@ -440,7 +490,7 @@ def process_pages(info_class, process_page, *other_actions):
 		if not ep:
 			log(info, 'Missing episode number')
 			continue
-		if not check_episode_number(info, ep):
+		if not info.sortkey:
 			log(info, 'Invalid episode number|{}|', ep)
 			continue
 
