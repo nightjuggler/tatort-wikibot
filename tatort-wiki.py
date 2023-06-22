@@ -281,12 +281,10 @@ def main():
 
 		if info.double_episode:
 			name = info.episode_name
-			urls = info.tatort_folge
-			if urls and urls[0]:
-				print(ep[0], info.infobox_date, name + ' (1)', urls[0], sep='|')
+			if urls := info.tatort_folge:
+				if urls[0]: print(ep[0], info.infobox_date, name + ' (1)', urls[0], sep='|')
+				if urls[1]: print(ep[0]+1, info.part2_date, name + ' (2)', urls[1], sep='|')
 			ep = (ep[0] + 1, 0)
-			if urls and urls[1]:
-				print(ep[0], info.part2_date, name + ' (2)', urls[1], sep='|')
 		elif info.tatort_folge:
 			print(info.episode_number, info.infobox_date, info.episode_name, info.tatort_folge, sep='|')
 
