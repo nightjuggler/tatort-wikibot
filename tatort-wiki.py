@@ -278,17 +278,17 @@ def main():
 			TW.check_attr(info, 'prev_episode', TW.EnDash)
 			TW.check_attr(info, 'prev_ep_date', '')
 
+		ep, orf = ep
 		if info.double_episode:
 			name = info.episode_name
 			urls = info.tatort_folge
-			ep = ep[0]
 			print(ep, info.infobox_date, name + ' (1)', urls[0], sep='|')
 			print(ep+1, info.part2_date, name + ' (2)', urls[1], sep='|')
-			ep = (ep+1, 0)
-		elif not info.orf:
+			ep += 1
+		elif not orf:
 			print(info.episode_number, info.infobox_date, info.episode_name, info.tatort_folge, sep='|')
 
-		next_ep = (ep[0], ep[1] + 1) if info.next_orf else (ep[0] + 1, 0)
+		next_ep = (ep, orf + 1) if info.next_orf else (ep + 1, 0)
 		prev = info
 
 	if prev:
