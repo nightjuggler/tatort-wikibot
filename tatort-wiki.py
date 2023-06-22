@@ -193,26 +193,24 @@ def check_double_episode_url(info, prev_url, url, expected_url):
 		mismatched_url(info, url[:-3], expected_url + 'folge-[12]-', 'Folge')
 		return None
 	prev = prev_url[part-1]
-	if prev is None:
+	if not prev:
 		prev_url[part-1] = url
 	elif url != prev:
 		log(info, 'Tatort-Folge with different URL|{}|{}|', url, prev)
 	return part
 
+URL_Suffix_Pattern = re.compile('[12][0-9][02468]')
+
 def check_tatort_folge(info):
 	expected_url = Tatort_Folge_URL_Map.get(info.episode_number, title2url(info.episode_name) + '-')
-	prev_url = [None]*2 if info.double_episode else None
+	prev_url = ['', ''] if info.double_episode else ''
 
 	for params in info.tatort_folge:
 		part = None
 		url = params.pop('Url', None)
 		if not url:
 			log(info, 'Missing Tatort-Folge URL')
-		elif not (len(url) > 3
-			and 49 <= ord(url[-3]) <= 50 # [12]
-			and 48 <= ord(url[-2]) <= 57 # [0-9]
-			and 48 <= ord(url[-1]) <= 57 # [0-9]
-		):
+		elif not URL_Suffix_Pattern.fullmatch(url[-3:]):
 			log(info, 'Invalid Tatort-Folge URL suffix|{}|', url)
 		else:
 			if url[0] == '/':
@@ -251,6 +249,7 @@ def check_info(info, page):
 		check_tatort_folge(info)
 	elif not info.orf:
 		log(info, 'Missing Tatort-Folge')
+		info.tatort_folge = ('', '') if info.double_episode else ''
 
 def main():
 	load_url_map('tatort-fans-url-map.txt', Tatort_Fans_URL_Map)
@@ -281,11 +280,12 @@ def main():
 
 		if info.double_episode:
 			name = info.episode_name
-			if urls := info.tatort_folge:
-				if urls[0]: print(ep[0], info.infobox_date, name + ' (1)', urls[0], sep='|')
-				if urls[1]: print(ep[0]+1, info.part2_date, name + ' (2)', urls[1], sep='|')
-			ep = (ep[0] + 1, 0)
-		elif info.tatort_folge:
+			urls = info.tatort_folge
+			ep = ep[0]
+			print(ep, info.infobox_date, name + ' (1)', urls[0], sep='|')
+			print(ep+1, info.part2_date, name + ' (2)', urls[1], sep='|')
+			ep = (ep+1, 0)
+		elif not info.orf:
 			print(info.episode_number, info.infobox_date, info.episode_name, info.tatort_folge, sep='|')
 
 		next_ep = (ep[0], ep[1] + 1) if info.next_orf else (ep[0] + 1, 0)

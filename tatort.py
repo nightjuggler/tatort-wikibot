@@ -20,6 +20,11 @@ class TatortSpec(object):
 		('1979-06-14', 'Ein Schuss zuviel'): '1979-06-04',
 	}
 	add = (
+		('2016-10-23', 'Die Wahrheit', 'die-wahrheit-142'),
+		('2020-11-15', 'Parasomnia', 'parasomnia-110'),
+		('2020-11-29', 'In der Familie (1)', ''),
+		('2020-12-06', 'In der Familie (2)', ''),
+		('2021-03-21', 'Wie alle anderen auch', 'wie-alle-anderen-auch-118'),
 	)
 
 class PolizeirufSpec(object):
@@ -306,13 +311,13 @@ def read_wiki(spec):
 	episodes = {}
 	with InputFile(spec.wiki_episodes) as f:
 		for line in f:
-			ep, date, title, url = line.split('|')
+			ep, date, title, url = line.rstrip().split('|')
 			unexpected_chars = title_pattern.sub('', title)
 			if unexpected_chars:
 				log('Unexpected characters [{}] in "{}"',
 					', '.join(['U+{:04X}'.format(ord(ch)) for ch in unexpected_chars]), title)
 			title = title_map.get(title, title.replace('\u2019', '\''))
-			episodes[int(ep)] = (date, title, url[:-1])
+			episodes[int(ep)] = [date, title, url]
 	return episodes
 
 def urlmap(spec):
@@ -330,7 +335,7 @@ def urlmap(spec):
 		last_url = None
 		for url in urls.split(','):
 			if not (len(url) > 3 and url[-3] in '12' and url[-2] in '0123456789' and url[-1] in '02468'):
-				log('Unexpected URL suffix: "{}"', url)
+				log('{}|{}|Unexpected URL suffix: "{}"', ep, title, url)
 				continue
 			url = url[:-3]
 			if url != wiki_url and url != last_url:
