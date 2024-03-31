@@ -20,11 +20,8 @@ class TatortSpec(object):
 		('1979-06-14', 'Ein Schuss zuviel'): '1979-06-04',
 	}
 	add = (
-		('2016-10-23', 'Die Wahrheit', 'die-wahrheit-142'),
-		('2020-11-15', 'Parasomnia', 'parasomnia-110'),
 		('2020-11-29', 'In der Familie (1)', ''),
 		('2020-12-06', 'In der Familie (2)', ''),
-		('2021-03-21', 'Wie alle anderen auch', 'wie-alle-anderen-auch-118'),
 	)
 
 class PolizeirufSpec(object):
